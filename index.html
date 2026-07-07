@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Double String Weave</title>
-    <link rel="stylesheet" href="./style.css?v=20260708-double-string-zfull">
+    <link rel="stylesheet" href="./style.css?v=20260708-double-string-random">
   </head>
   <body>
     <main class="app-shell">
@@ -49,9 +49,15 @@
               <textarea id="double-string-input" name="doubleString" rows="5" spellcheck="false"></textarea>
             </label>
 
+            <label class="field">
+              <span>Random length</span>
+              <input id="random-length-input" name="randomLength" type="number" min="1" max="24" step="1" inputmode="numeric" value="9">
+            </label>
+
             <div class="chain-box-move-actions">
               <button type="button" id="example-a-button" class="secondary-button">A3 example</button>
               <button type="button" id="example-mixed-button" class="secondary-button">Mixed L/R</button>
+              <button type="button" id="random-button" class="secondary-button">Random</button>
             </div>
           </section>
 
@@ -67,6 +73,6 @@
       </section>
     </main>
 
-    <script type="module" src="./src/double-string-weave.mjs?v=20260708-double-string-zfull"></script>
+    <script type="module" src="./src/double-string-weave.mjs?v=20260708-double-string-random"></script>
   </body>
 </html>

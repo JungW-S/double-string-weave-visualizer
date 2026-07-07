@@ -6,10 +6,12 @@ const form = document.querySelector("#input-form");
 const familyInput = document.querySelector("#family-input");
 const rankInput = document.querySelector("#rank-input");
 const doubleStringInput = document.querySelector("#double-string-input");
+const randomLengthInput = document.querySelector("#random-length-input");
 const output = document.querySelector("#output");
 const errorBox = document.querySelector("#error-box");
 const exampleAButton = document.querySelector("#example-a-button");
 const exampleMixedButton = document.querySelector("#example-mixed-button");
+const randomButton = document.querySelector("#random-button");
 
 const defaultExample = {
   family: "A",
@@ -75,6 +77,18 @@ function parseDoubleString(text) {
 
 function formatEntry(entry) {
   return `${entry.h}${entry.side}${entry.plus ? "+" : ""}`;
+}
+
+function randomInteger(min, max) {
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
+
+function randomSide() {
+  return Math.random() < 0.5 ? "L" : "R";
+}
+
+function randomDoubleStringText(dynkin, length) {
+  return Array.from({ length }, () => `${randomInteger(1, dynkin.rank)}${randomSide()}`).join(" ");
 }
 
 function buildDoubleStringTrace(input) {
@@ -185,6 +199,22 @@ exampleAButton.addEventListener("click", () => {
 exampleMixedButton.addEventListener("click", () => {
   writeInput(mixedExample);
   runConstruction();
+});
+
+randomButton.addEventListener("click", () => {
+  try {
+    clearError();
+    const family = normalizeDynkinFamily(familyInput.value);
+    const rank = parsePositiveInteger(rankInput.value, "rank");
+    const length = parsePositiveInteger(randomLengthInput.value, "random length");
+    if (length > 24) throw new Error("random length must be at most 24.");
+    const dynkin = createDynkinDatum({ family, rank });
+    doubleStringInput.value = randomDoubleStringText(dynkin, length);
+    runConstruction();
+  } catch (error) {
+    output.replaceChildren();
+    setError(error instanceof Error ? error.message : String(error));
+  }
 });
 
 writeInput(defaultExample);
