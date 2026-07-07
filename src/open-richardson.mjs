@@ -172,12 +172,17 @@ function isReducedTypeAWord(word, rank) {
   return coxeterLengthOfAction(actionOfWord(word, rank)) === word.length;
 }
 
-function complementWordForV(vWord, rank) {
-  return reduceCoxeterWord([...vWord].reverse().concat(longestWord(rank)), rank);
-}
-
 function starGeneratorTypeA(generator, rank) {
   return rank + 1 - generator;
+}
+
+function starWordForRichardsonRepresentative(word, rank) {
+  return word.slice().reverse().map((generator) => starGeneratorTypeA(generator, rank));
+}
+
+function complementWordForVStar(vStarWord, rank) {
+  const complementAction = multiplyActions(longestAction(rank), inverseAction(actionOfWord(vStarWord, rank)));
+  return reducedWordForAction(complementAction);
 }
 
 function combinationsOfSize(length, size) {
@@ -253,15 +258,16 @@ function readRichardsonDataInput() {
   if (wWord.length === 0) throw new Error("β(w) must be nonempty.");
   if (!isReducedTypeAWord(wWord, rank)) throw new Error("β(w) must be reduced.");
   if (!isReducedTypeAWord(vWord, rank)) throw new Error("v must be entered as a reduced word.");
-  const computedVcWord = complementWordForV(vWord, rank);
+  const { positions: plusPositions, subword: rightmostWord } = rightmostRepresentativePositions({ vWord, wWord, rank });
+  const vStarWord = starWordForRichardsonRepresentative(rightmostWord, rank);
+  const computedVcWord = complementWordForVStar(vStarWord, rank);
   const vcWord = String(vcInput.value ?? "").trim() === ""
     ? computedVcWord
     : parseTypeAWord(vcInput.value, "β(v^c)", rank);
   if (!isReducedTypeAWord(vcWord, rank)) throw new Error("β(v^c) must be reduced.");
-  if (!sameCoxeterElement(vcWord, computedVcWord, rank)) {
-    throw new Error("The entered β(v^c) does not represent v^{-1}w_0.");
+  if (!sameCoxeterElement(vcWord.concat(vStarWord), longestWord(rank), rank)) {
+    throw new Error("The entered β(v^c) does not satisfy β(v^c)β(v^*) = β(w_0).");
   }
-  const { positions: plusPositions, subword: rightmostWord } = rightmostRepresentativePositions({ vWord, wWord, rank });
   const generatedDoubleString = makeLeftRichardsonDoubleString({ vcWord, wWord, plusPositions });
   return {
     rank,
@@ -270,6 +276,7 @@ function readRichardsonDataInput() {
     vWord,
     vcWord,
     computedVcWord,
+    vStarWord,
     plusPositions,
     rightmostWord,
     generatedDoubleString,
@@ -302,11 +309,7 @@ function buildOpenRichardsonTrace() {
   const generatedText = formatDoubleString(data.generatedDoubleString);
   const activeGenerated = formatDoubleString(doubleString) === generatedText;
   const plusSet = new Set(data.plusPositions);
-  const terminalVStarBlock = data.plusPositions
-    .map((position) => data.wWord[position - 1])
-    .slice()
-    .reverse()
-    .map((entry) => starGeneratorTypeA(entry, data.rank));
+  const terminalVStarBlock = data.vStarWord.slice();
   const editorParams = new URLSearchParams({
     family: "A",
     rank: String(data.rank),
@@ -388,11 +391,12 @@ function renderRichardsonData(trace) {
     ["β(w)", textWord(ric.wWord)],
     ["v", textWord(ric.vWord)],
     ["β(v^c)", textWord(ric.vcWord)],
+    ["β(v*)", textWord(ric.terminalVStarBlock)],
     ["rightmost representative", textWord(ric.rightmostWord)],
     ["P_Ric", `{${ric.plusPositions.join(", ")}}`],
     ["M_Ric", `{${ric.nonPlusPositions.join(", ")}}`],
     ["dim R(v,w)", String(ric.dimension)],
-    ["deleted v^* block", textWord(ric.terminalVStarBlock)],
+    ["β(v^c)β(v*)", textWord(ric.vcWord.concat(ric.terminalVStarBlock))],
   ].forEach(([label, value]) => {
     const row = el("div", "ric-data-row");
     row.append(el("span", "ric-data-key", label), el("span", "formula ric-data-value", value));

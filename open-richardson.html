@@ -50,7 +50,7 @@
 
             <label class="field">
               <span>Optional reduced word β(v^c)</span>
-              <textarea id="vc-input" name="vc" rows="2" spellcheck="false" placeholder="leave blank to compute v^{-1}w_0"></textarea>
+              <textarea id="vc-input" name="vc" rows="2" spellcheck="false" placeholder="leave blank to compute from β(v^c)β(v*) = β(w0)"></textarea>
             </label>
 
             <label class="field">
@@ -68,7 +68,7 @@
           <button type="submit" class="primary-button">Compute Richardson weave</button>
           <p class="input-note">
             The page chooses the rightmost representative of <span class="formula">v</span> inside <span class="formula">β(w)</span>.
-            The <span class="formula">v^c</span> block is marked <span class="formula">+</span>, and the <span class="formula">w</span> block is marked <span class="formula">+</span> exactly on that representative.
+            The <span class="formula">β(v^c)</span> block is chosen so that <span class="formula">β(v^c)β(v*) = β(w0)</span>; the <span class="formula">w</span> block is marked <span class="formula">+</span> exactly on that representative.
           </p>
           <div id="error-box" class="error-box" hidden></div>
         </form>
