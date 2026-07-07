@@ -173,6 +173,23 @@ function syncUrl(trace) {
   window.history.replaceState(null, "", url);
 }
 
+function inputFromUrl() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const family = params.get("family");
+    const rank = params.get("rank");
+    const doubleString = params.get("s") ?? params.get("doubleString");
+    if (!family && !rank && !doubleString) return null;
+    return {
+      family: family ?? defaultExample.family,
+      rank: rank ?? defaultExample.rank,
+      doubleString: doubleString ?? defaultExample.doubleString,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function runConstruction({ preserveUrl = false } = {}) {
   try {
     clearError();
@@ -217,5 +234,5 @@ randomButton.addEventListener("click", () => {
   }
 });
 
-writeInput(defaultExample);
-runConstruction();
+writeInput(inputFromUrl() ?? defaultExample);
+runConstruction({ preserveUrl: Boolean(inputFromUrl()) });

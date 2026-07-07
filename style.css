@@ -123,6 +123,35 @@ h2 {
   text-underline-offset: 3px;
 }
 
+.page-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.page-nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.page-nav-link:hover,
+.page-nav-link.active {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  background: #eff6ff;
+}
+
 .workspace {
   display: grid;
   grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
