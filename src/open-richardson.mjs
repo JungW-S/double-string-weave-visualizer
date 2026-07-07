@@ -177,7 +177,7 @@ function starGeneratorTypeA(generator, rank) {
 }
 
 function starWordForRichardsonRepresentative(word, rank) {
-  return word.slice().reverse().map((generator) => starGeneratorTypeA(generator, rank));
+  return word.map((generator) => starGeneratorTypeA(generator, rank));
 }
 
 function complementWordForVStar(vStarWord, rank) {
