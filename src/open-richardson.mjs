@@ -89,57 +89,57 @@ function parseDoubleString(text) {
   return entries.map((entry, idx) => ({ ...entry, step: idx + 1, source: entry.source ?? "custom" }));
 }
 
-function identityPermutation(size) {
+function identityAction(size) {
   return Array.from({ length: size }, (_, idx) => idx + 1);
 }
 
-function simpleReflectionPermutation(index, size) {
-  const out = identityPermutation(size);
+function simpleReflectionAction(index, size) {
+  const out = identityAction(size);
   [out[index - 1], out[index]] = [out[index], out[index - 1]];
   return out;
 }
 
-function composePermutations(left, right) {
+function multiplyActions(left, right) {
   return right.map((value) => left[value - 1]);
 }
 
-function wordPermutation(word, rank) {
+function actionOfWord(word, rank) {
   const size = rank + 1;
-  let out = identityPermutation(size);
+  let out = identityAction(size);
   word.forEach((generator) => {
-    out = composePermutations(out, simpleReflectionPermutation(generator, size));
+    out = multiplyActions(out, simpleReflectionAction(generator, size));
   });
   return out;
 }
 
-function samePermutation(left, right) {
+function sameAction(left, right) {
   return left.length === right.length && left.every((value, idx) => value === right[idx]);
 }
 
-function inversePermutation(permutation) {
-  const out = Array(permutation.length);
-  permutation.forEach((value, idx) => {
+function inverseAction(action) {
+  const out = Array(action.length);
+  action.forEach((value, idx) => {
     out[value - 1] = idx + 1;
   });
   return out;
 }
 
-function w0Permutation(rank) {
+function longestAction(rank) {
   return Array.from({ length: rank + 1 }, (_, idx) => rank + 1 - idx);
 }
 
-function permutationLength(permutation) {
+function coxeterLengthOfAction(action) {
   let out = 0;
-  for (let i = 0; i < permutation.length; i += 1) {
-    for (let j = i + 1; j < permutation.length; j += 1) {
-      if (permutation[i] > permutation[j]) out += 1;
+  for (let i = 0; i < action.length; i += 1) {
+    for (let j = i + 1; j < action.length; j += 1) {
+      if (action[i] > action[j]) out += 1;
     }
   }
   return out;
 }
 
-function reducedWordFromPermutation(permutation) {
-  const arr = permutation.slice();
+function reducedWordForAction(action) {
+  const arr = action.slice();
   const rank = arr.length - 1;
   const word = [];
   while (true) {
@@ -156,14 +156,24 @@ function reducedWordFromPermutation(permutation) {
   return word.reverse();
 }
 
+function reduceCoxeterWord(word, rank) {
+  return reducedWordForAction(actionOfWord(word, rank));
+}
+
+function sameCoxeterElement(leftWord, rightWord, rank) {
+  return sameAction(actionOfWord(leftWord, rank), actionOfWord(rightWord, rank));
+}
+
+function longestWord(rank) {
+  return reducedWordForAction(longestAction(rank));
+}
+
 function isReducedTypeAWord(word, rank) {
-  return permutationLength(wordPermutation(word, rank)) === word.length;
+  return coxeterLengthOfAction(actionOfWord(word, rank)) === word.length;
 }
 
 function complementWordForV(vWord, rank) {
-  const vPermutation = wordPermutation(vWord, rank);
-  const complementPermutation = composePermutations(inversePermutation(vPermutation), w0Permutation(rank));
-  return reducedWordFromPermutation(complementPermutation);
+  return reduceCoxeterWord([...vWord].reverse().concat(longestWord(rank)), rank);
 }
 
 function starGeneratorTypeA(generator, rank) {
@@ -188,11 +198,10 @@ function combinationsOfSize(length, size) {
 }
 
 function rightmostRepresentativePositions({ vWord, wWord, rank }) {
-  const target = wordPermutation(vWord, rank);
   const size = vWord.length;
   for (const positions of combinationsOfSize(wWord.length, size).reverse()) {
     const subword = positions.map((position) => wWord[position - 1]);
-    if (samePermutation(wordPermutation(subword, rank), target)) {
+    if (sameCoxeterElement(subword, vWord, rank)) {
       return { positions, subword };
     }
   }
@@ -249,7 +258,7 @@ function readRichardsonDataInput() {
     ? computedVcWord
     : parseTypeAWord(vcInput.value, "β(v^c)", rank);
   if (!isReducedTypeAWord(vcWord, rank)) throw new Error("β(v^c) must be reduced.");
-  if (!samePermutation(wordPermutation(vcWord, rank), wordPermutation(computedVcWord, rank))) {
+  if (!sameCoxeterElement(vcWord, computedVcWord, rank)) {
     throw new Error("The entered β(v^c) does not represent v^{-1}w_0.");
   }
   const { positions: plusPositions, subword: rightmostWord } = rightmostRepresentativePositions({ vWord, wWord, rank });
@@ -502,12 +511,12 @@ function randomInteger(min, max) {
 
 function randomReducedWord(rank, targetLength) {
   let word = [];
-  let current = identityPermutation(rank + 1);
+  let current = identityAction(rank + 1);
   while (word.length < targetLength) {
     const candidates = [];
     for (let generator = 1; generator <= rank; generator += 1) {
-      const next = composePermutations(current, simpleReflectionPermutation(generator, rank + 1));
-      if (permutationLength(next) === permutationLength(current) + 1) candidates.push({ generator, next });
+      const next = multiplyActions(current, simpleReflectionAction(generator, rank + 1));
+      if (coxeterLengthOfAction(next) === coxeterLengthOfAction(current) + 1) candidates.push({ generator, next });
     }
     if (candidates.length === 0) break;
     const chosen = candidates[randomInteger(0, candidates.length - 1)];
