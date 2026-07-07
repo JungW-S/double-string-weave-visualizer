@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Double String Weave</title>
+    <link rel="stylesheet" href="./style.css?v=20260708-double-string-zfull">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">double inductive weave</p>
+          <h1><span class="formula header-formula">𝒲(s)</span> from a double string</h1>
+          <p class="subtitle">
+            Enter a double string <span class="formula">s=(i_1X_1,\ldots,i_lX_l)</span> and compute the associated double inductive weave, exchange data, and cluster variables.
+          </p>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <form id="input-form" class="input-panel">
+          <div class="panel-header">
+            <h2>Input</h2>
+          </div>
+
+          <section class="input-subpanel manual-input-panel">
+            <div class="input-subpanel-header">
+              <h3>Double string</h3>
+            </div>
+
+            <label class="field">
+              <span>Dynkin type</span>
+              <select id="family-input" name="family">
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Rank</span>
+              <input id="rank-input" name="rank" type="number" min="1" step="1" inputmode="numeric">
+            </label>
+
+            <label class="field">
+              <span>Double string entries</span>
+              <textarea id="double-string-input" name="doubleString" rows="5" spellcheck="false"></textarea>
+            </label>
+
+            <div class="chain-box-move-actions">
+              <button type="button" id="example-a-button" class="secondary-button">A3 example</button>
+              <button type="button" id="example-mixed-button" class="secondary-button">Mixed L/R</button>
+            </div>
+          </section>
+
+          <button type="submit" class="primary-button">Compute weave</button>
+          <p class="input-note">
+            Entries have the form <span class="formula">1L</span>, <span class="formula">2R</span>, or <span class="formula">1L+</span>.
+            The <span class="formula">+</span> marks are recomputed from the Demazure-product length test.
+          </p>
+          <div id="error-box" class="error-box" hidden></div>
+        </form>
+
+        <section id="output" class="output-panel" aria-live="polite"></section>
+      </section>
+    </main>
+
+    <script type="module" src="./src/double-string-weave.mjs?v=20260708-double-string-zfull"></script>
+  </body>
+</html>
