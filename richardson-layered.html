@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Layered Richardson Weave</title>
+    <link rel="stylesheet" href="./style.css?v=20260708-richardson-layered-fix19">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">open Richardson weave</p>
+          <h1>Layered Richardson weave</h1>
+          <p class="subtitle">
+            Follow the prefix path of <span class="formula">β(w)</span> and draw the CGGLS left-inductive weave for <span class="formula">s<sub>Ric</sub><sup>L</sup>(t)</span>.
+          </p>
+          <nav class="page-nav" aria-label="Visualizer pages">
+            <a class="page-nav-link" href="./double-string-weave.html">Double string</a>
+            <a class="page-nav-link" href="./open-richardson.html">Open Richardson</a>
+            <a class="page-nav-link active" href="./richardson-layered.html">Layered Richardson</a>
+          </nav>
+        </div>
+      </header>
+
+      <section class="workspace layered-workspace">
+        <form id="input-form" class="input-panel">
+          <div class="panel-header">
+            <h2>Input</h2>
+          </div>
+
+          <section class="input-subpanel manual-input-panel">
+            <div class="input-subpanel-header">
+              <h3>Type A data</h3>
+            </div>
+
+            <label class="field">
+              <span>Rank n in Aₙ</span>
+              <input id="rank-input" name="rank" type="number" min="1" step="1" inputmode="numeric" value="3">
+            </label>
+
+            <label class="field">
+              <span>Reduced word β(w)</span>
+              <textarea id="w-input" name="w" rows="2" spellcheck="false">1 2 1 3 2</textarea>
+            </label>
+
+            <label class="field">
+              <span>Reduced word for v</span>
+              <textarea id="v-input" name="v" rows="2" spellcheck="false">3</textarea>
+            </label>
+
+            <label class="field layered-slider-field">
+              <span>Prefix t</span>
+              <input id="layer-input" name="layer" type="range" min="0" max="3" step="1" value="3">
+              <output id="layer-output" class="layer-output">t=3</output>
+            </label>
+
+            <div class="chain-box-move-actions">
+              <button type="button" id="example-a2-button" class="secondary-button">A2 example</button>
+              <button type="button" id="example-a3-button" class="secondary-button">A3 default</button>
+            </div>
+          </section>
+
+          <button type="submit" class="primary-button">Build layered weave</button>
+          <p class="input-note">
+            The slider shows the prefix <span class="formula">β(w<sub>t</sub>)=i<sub>1</sub>⋯i<sub>t</sub></span>. Build uses the final prefix by default.
+          </p>
+          <div id="error-box" class="error-box" hidden></div>
+        </form>
+
+        <section id="output" class="output-panel" aria-live="polite"></section>
+      </section>
+    </main>
+
+    <script type="module" src="./src/richardson-layered.mjs?v=20260708-richardson-layered-fix19"></script>
+  </body>
+</html>

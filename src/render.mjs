@@ -929,7 +929,7 @@ function generatorColor(generator) {
   return palette[(generator - 1) % palette.length];
 }
 
-function cycleColor(index) {
+export function cycleColor(index) {
   const palette = [
     "#6d6bff",
     "#ef4d75",
@@ -1587,7 +1587,7 @@ function renderPinningDetails(trace) {
   return details;
 }
 
-function renderClusterVariableAnswerPanel(trace, cycleColors, onSelect = null, onClear = null, options = {}) {
+export function renderClusterVariableAnswerPanel(trace, cycleColors, onSelect = null, onClear = null, options = {}) {
   const weaveLabel = options.weaveLabel ?? "𝒲_{Δ̲}(ℭ)";
   const variableHeader = options.variableHeader ?? `A_t = A_t(${weaveLabel})`;
   const values = clusterValuesForDisplay(trace);
@@ -1682,7 +1682,7 @@ function renderClusterVariableAnswerPanel(trace, cycleColors, onSelect = null, o
   return panel;
 }
 
-function renderInteractiveWeaveViewer(trace, {
+export function renderInteractiveWeaveViewer(trace, {
   initialLabel = null,
   cycleColors = null,
   onSelectionChange = null,
@@ -1778,6 +1778,41 @@ function renderInteractiveWeaveViewer(trace, {
   divider.setAttribute("class", "full-weave-divider");
   svg.appendChild(divider);
   appendText(svg, 22, junctionY - 6, trace.junctionLabel ?? "i_{Δ̲}(ℭ)", "full-weave-junction-label");
+
+  [...(trace.layerStrips ?? [])]
+    .sort((left, right) => Number(Boolean(left.empty)) - Number(Boolean(right.empty)))
+    .forEach((layer) => {
+    if (!Number.isInteger(layer.startMove) || !Number.isInteger(layer.endMove)) return;
+    if (layer.startMove < 0 || layer.startMove > bottomBoundaryYs.length - 1) return;
+    const emptyLayer = layer.empty || layer.endMove <= layer.startMove;
+    if (!emptyLayer && layer.endMove > bottomBoundaryYs.length - 1) return;
+    const topY = bottomBoundaryYs[layer.startMove];
+    const botY = emptyLayer ? topY + 22 : bottomBoundaryYs[layer.endMove];
+    const band = svgEl("rect");
+    band.setAttribute("x", "24");
+    band.setAttribute("y", String(topY + 3));
+    band.setAttribute("width", String(width - 48));
+    band.setAttribute("height", String(Math.max(14, botY - topY - 6)));
+    band.setAttribute("rx", "8");
+    band.setAttribute("class", [
+      "weave-layer-band",
+      layer.caseType ?? "",
+      layer.active ? "active" : "",
+      emptyLayer ? "empty" : "",
+    ].filter(Boolean).join(" "));
+    svg.appendChild(band);
+
+    const label = svgEl("text");
+    label.setAttribute("x", "31");
+    label.setAttribute("y", String(topY + 17));
+    label.setAttribute("class", [
+      "weave-layer-band-label",
+      layer.caseType ?? "",
+      layer.active ? "active" : "",
+    ].filter(Boolean).join(" "));
+    label.textContent = layer.label ?? `t=${layer.layer}`;
+    svg.appendChild(label);
+    });
 
   weave.moves.forEach((stripMove, idx) => {
     drawViewerMove(weave, stripMove, idx, bottomBoundaryYs[idx], bottomBoundaryYs[idx + 1]);
@@ -2932,7 +2967,7 @@ function renderQuiverSvg(quiver, cycleColors, onSelect = null, onArrowSelect = n
   return svg;
 }
 
-function renderQuiverAnswerPanel(weave, cycleColors, onSelect = null, onArrowSelect = null, options = {}) {
+export function renderQuiverAnswerPanel(weave, cycleColors, onSelect = null, onArrowSelect = null, options = {}) {
   const quiver = weave.quiverData;
   const ordinary = quiver?.ordinaryQuiver !== false;
   const quiverLabel = options.quiverLabel ?? (ordinary ? "Q(𝒲_{Δ̲}(ℭ))" : "ε(𝒲_{Δ̲}(ℭ))");
@@ -3559,7 +3594,7 @@ function renderDoubleStringInputTrace(trace) {
   panel.appendChild(note);
 
   body.appendChild(panel);
-  return renderCard("s", body);
+  return renderCard(trace.doubleStringTitle ?? "s", body);
 }
 
 function renderDoubleStringTrace(trace, container) {

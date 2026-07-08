@@ -2800,6 +2800,53 @@ h2 {
   stroke-linejoin: round;
 }
 
+.weave-layer-band {
+  fill: rgba(15, 107, 122, 0.045);
+  stroke: rgba(15, 107, 122, 0.18);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.weave-layer-band.case1 {
+  fill: rgba(37, 99, 235, 0.045);
+  stroke: rgba(37, 99, 235, 0.2);
+}
+
+.weave-layer-band.case2 {
+  fill: rgba(220, 38, 38, 0.045);
+  stroke: rgba(220, 38, 38, 0.2);
+}
+
+.weave-layer-band.active {
+  fill: rgba(15, 107, 122, 0.09);
+  stroke: rgba(15, 107, 122, 0.45);
+  stroke-width: 1.5;
+}
+
+.weave-layer-band.empty {
+  fill: rgba(148, 163, 184, 0.055);
+  stroke-dasharray: 4 4;
+}
+
+.weave-layer-band-label {
+  font-size: 9px;
+  fill: #53636f;
+  font-weight: 850;
+  pointer-events: none;
+}
+
+.weave-layer-band-label.case1 {
+  fill: #2457b8;
+}
+
+.weave-layer-band-label.case2 {
+  fill: #b5292f;
+}
+
+.weave-layer-band-label.active {
+  fill: var(--accent-strong);
+}
+
 .weave-dashed-ray {
   stroke: #111;
   stroke-width: 1.4;
@@ -4149,5 +4196,304 @@ h2 {
 
   .a-box-fold {
     justify-self: start;
+  }
+}
+
+.layered-workspace {
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+}
+
+.layered-slider-field input[type="range"] {
+  padding: 0;
+}
+
+.layer-output {
+  justify-self: start;
+  min-width: 54px;
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 850;
+  padding: 4px 8px;
+}
+
+.layered-richardson-view {
+  display: grid;
+  gap: 18px;
+}
+
+.layered-top-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.72fr) minmax(0, 1.28fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.layered-facts-card,
+.layered-visual-card,
+.layered-main-weave-card {
+  padding: 16px;
+}
+
+.layered-visual-card {
+  display: grid;
+  gap: 16px;
+}
+
+.layered-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.layered-panel-head h3,
+.layered-double-string h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.layered-weak-wrap,
+.layered-stack-wrap,
+.layered-double-string {
+  min-width: 0;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  background: #fbfcfc;
+  padding: 12px;
+}
+
+.layered-facts-card {
+  display: grid;
+  gap: 12px;
+}
+
+.layered-data-section {
+  display: grid;
+  gap: 7px;
+}
+
+.layered-data-section h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.layered-facts-card .layered-data-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 7px;
+  border-top: 0;
+  padding: 0;
+}
+
+.layered-facts-card .ric-data-row {
+  grid-template-columns: minmax(78px, 0.38fr) minmax(0, 1fr);
+  align-items: start;
+  min-height: 0;
+  padding: 7px 9px;
+}
+
+.layered-facts-card .ric-data-key {
+  line-height: 1.25;
+}
+
+.layered-facts-card .ric-data-value {
+  display: block;
+  min-width: 0;
+  line-height: 1.25;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.layered-data-details {
+  border-top: 1px solid var(--soft-line);
+  padding-top: 8px;
+}
+
+.layered-data-details summary {
+  cursor: pointer;
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.layered-data-details .layered-data-grid {
+  margin-top: 8px;
+}
+
+.layered-weak-svg {
+  display: block;
+  width: 100%;
+  min-height: 220px;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.layered-weak-edge {
+  stroke: #c8d3d8;
+  stroke-width: 1.4;
+}
+
+.layered-weak-edge.path-edge {
+  stroke-width: 3.4;
+}
+
+.layered-weak-edge.case1 {
+  stroke: #2563eb;
+}
+
+.layered-weak-edge.case2 {
+  stroke: #dc2626;
+}
+
+.layered-edge-label {
+  font-size: 11px;
+  font-weight: 850;
+  text-anchor: middle;
+}
+
+.layered-edge-label.case1 {
+  fill: #1d4ed8;
+}
+
+.layered-edge-label.case2 {
+  fill: #b91c1c;
+}
+
+.layered-weak-node {
+  fill: #fff;
+  stroke: #9aaab2;
+  stroke-width: 1.5;
+}
+
+.layered-weak-node-group.on-path .layered-weak-node {
+  stroke: var(--accent-strong);
+  stroke-width: 2.4;
+}
+
+.layered-weak-node-group.active .layered-weak-node {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+  stroke-width: 4;
+}
+
+.layered-weak-label {
+  fill: var(--ink);
+  font-size: 12px;
+  font-weight: 850;
+  text-anchor: middle;
+}
+
+.layered-stack {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
+  gap: 9px;
+}
+
+.layer-card {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  min-height: 96px;
+  border: 1px solid var(--line);
+  border-left-width: 5px;
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.layer-card.base {
+  border-left-color: var(--accent);
+}
+
+.layer-card.case1 {
+  border-left-color: #2563eb;
+}
+
+.layer-card.case2 {
+  border-left-color: #dc2626;
+}
+
+.layer-card:hover,
+.layer-card.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(15, 107, 122, 0.13);
+}
+
+.layer-card-kicker {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.layer-card strong {
+  font-size: 13px;
+}
+
+.layer-card span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.layer-card-pair {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.layered-double-string {
+  display: grid;
+  gap: 9px;
+}
+
+.layered-seed-panels {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.layered-edge-variable-panel .edge-label-viewer {
+  margin-top: 10px;
+}
+
+.layered-seed-panels .quiver-answer-panel,
+.layered-seed-panels .cluster-answer-panel {
+  min-width: 0;
+}
+
+.layered-seed-panels .cluster-answer-list {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 980px) {
+  .layered-top-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .layered-seed-panels {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .layered-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .layered-stack {
+    grid-template-columns: 1fr;
   }
 }
