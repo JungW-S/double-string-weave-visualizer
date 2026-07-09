@@ -13,14 +13,15 @@
           <p class="eyebrow">open Richardson weave</p>
           <h1>Layered Richardson weave</h1>
           <p class="subtitle">
-            Build the local test version using <span class="formula">v<sup>c</sup>=w<sub>0</sub>v</span>,
+            Visualize the right-inductive layered convention using <span class="formula">v<sup>c</sup>=w<sub>0</sub>v</span>,
             <span class="formula">v<sup>c</sup>β(w)=(j<sub>1</sub>,...,j<sub>ℓ</sub>)</span>, and
             <span class="formula">s<sub>w,v</sub>=(j<sub>1</sub>R,...,j<sub>ℓ</sub>R)</span>.
           </p>
           <nav class="page-nav" aria-label="Visualizer pages">
             <a class="page-nav-link" href="./double-string-weave.html">Double string</a>
-            <a class="page-nav-link" href="./open-richardson.html">Menard's seed</a>
+            <a class="page-nav-link" href="./open-richardson.html">Ménard's seed</a>
             <a class="page-nav-link active" href="./richardson-layered.html">Layered Richardson</a>
+            <a class="page-nav-link" href="./richardson-gls-quiver.html">GLS Quiver</a>
           </nav>
         </div>
       </header>
@@ -38,17 +39,17 @@
 
             <label class="field">
               <span>Rank n in Aₙ</span>
-              <input id="rank-input" name="rank" type="number" min="1" step="1" inputmode="numeric" value="3">
+              <input id="rank-input" name="rank" type="number" min="1" step="1" inputmode="numeric" value="4">
             </label>
 
             <label class="field">
               <span>Reduced word β(w)</span>
-              <textarea id="w-input" name="w" rows="2" spellcheck="false">2 3 1 2 1</textarea>
+              <textarea id="w-input" name="w" rows="2" spellcheck="false">1 2 3 4 2 3 1 2</textarea>
             </label>
 
             <label class="field">
               <span>Reduced word for v</span>
-              <textarea id="v-input" name="v" rows="2" spellcheck="false">2 1</textarea>
+              <textarea id="v-input" name="v" rows="2" spellcheck="false">2 3</textarea>
             </label>
 
             <label class="field">
@@ -58,12 +59,17 @@
 
             <label class="field layered-slider-field">
               <span>Layer a</span>
-              <input id="layer-input" name="layer" type="range" min="0" max="5" step="1" value="5">
-              <output id="layer-output" class="layer-output">a=5</output>
+              <input id="layer-input" name="layer" type="range" min="0" max="8" step="1" value="8">
+              <output id="layer-output" class="layer-output">a=8</output>
             </label>
 
+            <div class="layer-step-actions" aria-label="Layer navigation">
+              <button type="button" id="layer-prev-button" class="secondary-button">Prev layer</button>
+              <button type="button" id="layer-next-button" class="secondary-button">Next layer</button>
+            </div>
+
             <div class="chain-box-move-actions">
-              <button type="button" id="photo-example-button" class="secondary-button">A3 example</button>
+              <button type="button" id="photo-example-button" class="secondary-button">A4 example</button>
               <button type="button" id="small-example-button" class="secondary-button">A2 example</button>
             </div>
           </section>
@@ -80,6 +86,6 @@
       </section>
     </main>
 
-    <script type="module" src="./src/richardson-layered.mjs?v=20260709-layered-richardson"></script>
+    <script type="module" src="./src/richardson-layered.mjs?v=20260710-layered-richardson-a4"></script>
   </body>
 </html>

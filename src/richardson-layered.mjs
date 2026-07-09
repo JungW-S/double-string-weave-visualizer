@@ -1,11 +1,11 @@
-import { createDynkinDatum } from "./dynkin.mjs?v=20260709-layered-richardson";
-import { completeWeaveFromComputedStrips } from "./weave.mjs?v=20260709-layered-richardson";
+import { createDynkinDatum } from "./dynkin.mjs?v=20260710-layered-richardson-a4";
+import { completeWeaveFromComputedStrips } from "./weave.mjs?v=20260710-layered-richardson-a4";
 import {
   cycleColor,
   renderClusterVariableAnswerPanel,
   renderInteractiveWeaveViewer,
   renderQuiverAnswerPanel,
-} from "./render.mjs?v=20260709-layered-richardson";
+} from "./render.mjs?v=20260710-layered-richardson-a4";
 
 const form = document.querySelector("#input-form");
 const rankInput = document.querySelector("#rank-input");
@@ -18,12 +18,14 @@ const output = document.querySelector("#output");
 const errorBox = document.querySelector("#error-box");
 const photoExampleButton = document.querySelector("#photo-example-button");
 const smallExampleButton = document.querySelector("#small-example-button");
+const layerPrevButton = document.querySelector("#layer-prev-button");
+const layerNextButton = document.querySelector("#layer-next-button");
 
 const examples = {
   photo: {
-    rank: "3",
-    w: "2 3 1 2 1",
-    v: "2 1",
+    rank: "4",
+    w: "1 2 3 4 2 3 1 2",
+    v: "2 3",
     vc: "",
   },
   small: {
@@ -239,7 +241,7 @@ function buildGreedySequence({ rank, wWord, vWord }) {
   });
 
   if (coxeterLengthOfAction(current) !== 0) {
-    throw new Error("The greedy left sequence did not end at e. Check that v <= w for the entered β(w).");
+    throw new Error("The greedy right sequence did not end at e. Check that v <= w for the entered β(w).");
   }
 
   return {
@@ -701,7 +703,7 @@ function renderConventionCard(data, partial) {
   formula.appendChild(htmlEl("p", "", "<span class=\"formula\">v<sup>c</sup>=w<sub>0</sub>v</span>."));
   formula.appendChild(htmlEl("p", "", "<span class=\"formula\">v<sup>c</sup>β(w)=(j<sub>1</sub>,...,j<sub>ℓ</sub>)</span>."));
   formula.appendChild(htmlEl("p", "", "<span class=\"formula\">s<sub>w,v</sub>=(j<sub>1</sub>R,...,j<sub>ℓ</sub>R)</span>."));
-  formula.appendChild(htmlEl("p", "", "The page draws the right inductive weave attached to the all-right double string."));
+  formula.appendChild(htmlEl("p", "", "Draw the right inductive weave attached to the all-right string <span class=\"formula\">s<sub>w,v</sub></span>."));
   formula.appendChild(htmlEl("p", "", "The greedy sequence uses <span class=\"formula\">v<sub>≥k</sub>s<sub>iₖ</sub></span>, so all multiplications on the <span class=\"formula\">v</span>-side are right multiplications."));
   card.appendChild(formula);
 
@@ -753,7 +755,7 @@ function renderGreedyTable(data) {
   table.appendChild(body);
   card.appendChild(table);
   const note = el("p", "small-note");
-  note.textContent = "t_k=1 means v_{≥k}=v_{≥k+1}; t_k=0 means v_{≥k+1}=v_{≥k}s_{i_k}.";
+  note.textContent = "t_k=1 leaves v unchanged; t_k=0 changes v by right multiplication.";
   card.appendChild(note);
   return card;
 }
@@ -784,9 +786,132 @@ function renderPathTable(data, layer) {
   return card;
 }
 
+function renderWeakBruhatPath(data, layer) {
+  const card = el("section", "card layered-visual-card layered-weak-card");
+  const head = el("div", "layered-panel-head");
+  head.appendChild(el("h3", "", "Greedy weak path"));
+  const legend = el("div", "layered-path-legend");
+  [
+    ["case1", "tₖ=0"],
+    ["case2", "tₖ=1"],
+  ].forEach(([className, label]) => {
+    const item = el("span", "layered-path-legend-item");
+    item.appendChild(el("span", `layered-path-swatch ${className}`));
+    item.appendChild(el("span", "", label));
+    legend.appendChild(item);
+  });
+  head.appendChild(legend);
+  card.appendChild(head);
+
+  const steps = data.pathSteps;
+  const edgeCount = Math.max(steps.length - 1, 1);
+  const gap = 138;
+  const width = Math.max(720, 120 + gap * edgeCount);
+  const height = 188;
+  const y = 82;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "layered-weak-svg");
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", "Weak Bruhat path determined by the t sequence");
+
+  const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+  [
+    ["case1", "#2563eb"],
+    ["case2", "#dc2626"],
+    ["muted", "#9aaab2"],
+  ].forEach(([name, color]) => {
+    const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+    marker.setAttribute("id", `layered-weak-arrow-${name}`);
+    marker.setAttribute("markerWidth", "9");
+    marker.setAttribute("markerHeight", "7");
+    marker.setAttribute("refX", "8");
+    marker.setAttribute("refY", "3.5");
+    marker.setAttribute("orient", "auto");
+    const headPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    headPath.setAttribute("d", "M0,0 L9,3.5 L0,7 Z");
+    headPath.setAttribute("fill", color);
+    marker.appendChild(headPath);
+    defs.appendChild(marker);
+  });
+  svg.appendChild(defs);
+
+  function svgNode(name) {
+    return document.createElementNS("http://www.w3.org/2000/svg", name);
+  }
+
+  function appendSvgText(parent, x, yy, text, className) {
+    const node = svgNode("text");
+    node.setAttribute("x", String(x));
+    node.setAttribute("y", String(yy));
+    node.setAttribute("class", className);
+    node.textContent = text;
+    parent.appendChild(node);
+    return node;
+  }
+
+  steps.slice(1).forEach((step) => {
+    const prevX = 58 + gap * (step.a - 1);
+    const nextX = 58 + gap * step.a;
+    const className = step.tau === 1 ? "case2" : "case1";
+    const active = step.a === layer;
+    const edge = svgNode("line");
+    edge.setAttribute("x1", String(prevX + 23));
+    edge.setAttribute("x2", String(nextX - 23));
+    edge.setAttribute("y1", String(y));
+    edge.setAttribute("y2", String(y));
+    edge.setAttribute("class", [
+      "layered-weak-edge",
+      "path-edge",
+      className,
+      step.a <= layer ? "built" : "future",
+      active ? "active" : "",
+    ].filter(Boolean).join(" "));
+    edge.setAttribute("marker-end", `url(#layered-weak-arrow-${step.a <= layer ? className : "muted"})`);
+    edge.addEventListener("click", () => setLayer(step.a));
+    svg.appendChild(edge);
+
+    const midX = (prevX + nextX) / 2;
+    appendSvgText(svg, midX, y - 22, `k=${step.originalK}, i=${step.generator}`, `layered-edge-label ${className}`);
+    appendSvgText(svg, midX, y + 34, `t=${step.tau}`, `layered-edge-label ${className} ${active ? "active" : ""}`);
+  });
+
+  steps.forEach((step) => {
+    const x = 58 + gap * step.a;
+    const group = svgNode("g");
+    group.setAttribute("class", [
+      "layered-weak-node-group",
+      step.a <= layer ? "on-path" : "",
+      step.a === layer ? "active" : "",
+    ].filter(Boolean).join(" "));
+    group.addEventListener("click", () => setLayer(step.a));
+    group.setAttribute("tabindex", "0");
+    group.setAttribute("role", "button");
+    group.setAttribute("aria-label", `Set layer ${step.a}`);
+    const circle = svgNode("circle");
+    circle.setAttribute("cx", String(x));
+    circle.setAttribute("cy", String(y));
+    circle.setAttribute("r", "22");
+    circle.setAttribute("class", "layered-weak-node");
+    group.appendChild(circle);
+    appendSvgText(group, x, y + 4, `a=${step.a}`, "layered-weak-label");
+    appendSvgText(group, x, y + 48, `w=${textWord(step.wWord)}`, "layered-weak-state-label");
+    appendSvgText(group, x, y + 64, `v=${textWord(step.vWord)}`, "layered-weak-state-label muted");
+    svg.appendChild(group);
+  });
+
+  const scroll = el("div", "layered-weak-scroll");
+  scroll.appendChild(svg);
+  card.appendChild(scroll);
+  const note = el("p", "small-note");
+  note.textContent = "Click a node or colored edge to move the layer. Blue means t_k=0; red means t_k=1.";
+  card.appendChild(note);
+  return card;
+}
+
 function renderLayerCards(data, layer, activeLayer) {
   const card = el("section", "card reverse-layer-card");
-  card.appendChild(el("h2", "", "Layers"));
+  card.appendChild(el("h2", "", "Built layers"));
   const strip = el("div", "layered-stack reverse-layer-stack");
   data.pathSteps.slice(1, layer + 1).reverse().forEach((step) => {
     const button = el("button", [
@@ -815,13 +940,13 @@ function renderLayerCards(data, layer, activeLayer) {
 
 function renderCurrentDoubleString(partial) {
   const card = el("section", "card reverse-string-card");
-  card.appendChild(el("h2", "", "Current all-right double string"));
+  card.appendChild(el("h2", "", "All-right string at layer a"));
   const expression = el("div", "double-string-expression richardson-string-expression reverse-string-expression");
   expression.appendChild(el("span", "formula", "sᵃ(w,v) = "));
   expression.appendChild(renderDoubleStringChips(partial.doubleString));
   card.appendChild(expression);
   const note = el("p", "small-note");
-  note.textContent = "The + marks are the actual length-increasing steps of the right inductive weave. Colors still record the v^c block and the Richardson t_k data.";
+  note.textContent = "The + marks length-increasing steps. Colors record the v^c block and the t_k data in the w block.";
   card.appendChild(note);
   const legend = el("div", "reverse-chip-legend");
   [
@@ -862,13 +987,16 @@ function renderSeedPanels(trace) {
   const weavePanel = el("div", "answer-panel layered-edge-variable-panel reverse-weave-panel");
   const header = el("div", "answer-panel-header");
   header.appendChild(el("h3", "", "Weave"));
-  header.appendChild(el("div", "answer-panel-actions", "select an object"));
+  header.appendChild(el("div", "answer-panel-actions", "click edges or vertices"));
   weavePanel.appendChild(header);
   const note = el("p", "small-note");
   note.textContent = "Bands mark Richardson layers in the right inductive weave. A t_k=1 layer contains the right-inductive braid path ending at a trivalent vertex; a t_k=0 layer is length-increasing.";
   weavePanel.appendChild(note);
   const viewer = renderInteractiveWeaveViewer(trace, { cycleColors });
-  viewer.classList.add("main-interactive-weave", "layered-edge-variable-viewer");
+  viewer.classList.add(
+    "main-interactive-weave",
+    "layered-edge-variable-viewer",
+  );
   weavePanel.appendChild(viewer);
 
   const quiverPanel = renderQuiverAnswerPanel(trace.bottomWeave, cycleColors, selectCluster, null, {
@@ -885,21 +1013,42 @@ function renderSeedPanels(trace) {
   return panels;
 }
 
+function childrenWithoutHeading(card) {
+  const heading = card.querySelector("h2");
+  if (heading) heading.remove();
+  return Array.from(card.childNodes);
+}
+
+function renderDetailPanel(title, card, open = false) {
+  const details = el("details", "layered-detail-panel");
+  if (open) details.open = true;
+  details.appendChild(el("summary", "layered-detail-summary", title));
+  const body = el("div", "layered-detail-body");
+  childrenWithoutHeading(card).forEach((child) => body.appendChild(child));
+  details.appendChild(body);
+  return details;
+}
+
+function renderDiagnosticsPanel(data, layer, activeLayer) {
+  const card = el("section", "card layered-diagnostics-card reverse-diagnostics-card");
+  card.appendChild(el("h2", "", "Details"));
+  card.append(
+    renderDetailPanel("Greedy sequence v≥k", renderGreedyTable(data)),
+    renderDetailPanel("Layered path", renderPathTable(data, layer), true),
+    renderDetailPanel("Built layers", renderLayerCards(data, layer, activeLayer)),
+  );
+  return card;
+}
+
 function renderData(data, layer, activeLayer = layer) {
   data.activeLayer = activeLayer;
   const partial = buildPartialData(data, layer);
   const root = el("div", "layered-richardson-view reverse-richardson-view");
-  const top = el("div", "layered-top-grid reverse-top-grid");
-  top.appendChild(renderConventionCard(data, partial));
-  const right = el("div", "reverse-side-stack");
-  right.append(
-    renderGreedyTable(data),
-    renderPathTable(data, layer),
-    renderLayerCards(data, layer, activeLayer),
+  root.append(
+    renderConventionCard(data, partial),
+    renderWeakBruhatPath(data, layer),
     renderCurrentDoubleString(partial),
   );
-  top.appendChild(right);
-  root.appendChild(top);
 
   const weaveCard = el("section", "card layered-main-weave-card reverse-main-weave-card");
   weaveCard.appendChild(htmlEl("h2", "", `𝒲<sub>layer</sub>(a=${layer})`));
@@ -908,6 +1057,7 @@ function renderData(data, layer, activeLayer = layer) {
   weaveCard.appendChild(subtitle);
   weaveCard.appendChild(renderSeedPanels(partial.trace));
   root.appendChild(weaveCard);
+  root.appendChild(renderDiagnosticsPanel(data, layer, activeLayer));
   output.replaceChildren(root);
 }
 
@@ -955,6 +1105,8 @@ function syncSlider(data, layer) {
   layerInput.value = String(layer);
   layerOutput.value = `a=${layer}`;
   layerOutput.textContent = `a=${layer}`;
+  if (layerPrevButton) layerPrevButton.disabled = layer <= 0;
+  if (layerNextButton) layerNextButton.disabled = layer >= data.wWord.length;
   vcInput.placeholder = computedVcWord(data.vWord, data.rank).join(" ");
 }
 
@@ -1008,6 +1160,45 @@ form.addEventListener("submit", (event) => {
 layerInput.addEventListener("input", () => {
   if (currentData) setLayer(Number(layerInput.value));
 });
+
+layerInput.addEventListener("keydown", (event) => {
+  if (!currentData) return;
+  if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
+    event.preventDefault();
+    setLayer(currentLayer - 1);
+  } else if (event.key === "ArrowRight" || event.key === "ArrowUp") {
+    event.preventDefault();
+    setLayer(currentLayer + 1);
+  } else if (event.key === "Home") {
+    event.preventDefault();
+    setLayer(0);
+  } else if (event.key === "End") {
+    event.preventDefault();
+    setLayer(currentData.wWord.length);
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (!currentData) return;
+  const target = event.target;
+  const tagName = target?.tagName?.toLowerCase?.() ?? "";
+  if (tagName === "textarea" || (tagName === "input" && target !== layerInput)) return;
+  if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    setLayer(currentLayer - 1);
+  } else if (event.key === "ArrowRight") {
+    event.preventDefault();
+    setLayer(currentLayer + 1);
+  }
+});
+
+if (layerPrevButton) {
+  layerPrevButton.addEventListener("click", () => setLayer(currentLayer - 1));
+}
+
+if (layerNextButton) {
+  layerNextButton.addEventListener("click", () => setLayer(currentLayer + 1));
+}
 
 photoExampleButton.addEventListener("click", () => {
   writeExample(examples.photo);
