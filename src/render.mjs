@@ -1065,6 +1065,8 @@ function drawStripGeometry(svg, {
     drawDirect(p, p + 1);
     drawDirect(p + 1, p);
     for (let idx = p + 2; idx < before.length; idx += 1) drawDirect(idx, idx);
+  } else if (move.type === "straight") {
+    for (let idx = 0; idx < before.length; idx += 1) drawDirect(idx, idx);
   } else if (move.type === "hexa") {
     for (let idx = 0; idx < p; idx += 1) drawDirect(idx, idx);
     const vertexX = (topX[p] + topX[p + 1] + topX[p + 2]) / 3;
@@ -3343,7 +3345,7 @@ function renderOpenRichardsonSummary(trace) {
   const body = el("div", "double-string-block");
   const panel = el("div", "string-construction-panel");
   const header = el("div", "string-panel-header");
-  header.appendChild(el("span", "string-panel-title", "Open Richardson data"));
+  header.appendChild(el("span", "string-panel-title", "Menard's seed data"));
   panel.appendChild(header);
 
   const facts = el("div", "ric-data-grid");

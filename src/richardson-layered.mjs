@@ -1,38 +1,41 @@
-import { createDynkinDatum } from "./dynkin.mjs?v=20260708-richardson-layered-fix19";
-import { buildDoubleInductiveWeave } from "./weave.mjs?v=20260708-richardson-layered-fix19";
+import { createDynkinDatum } from "./dynkin.mjs?v=20260709-layered-richardson";
+import { completeWeaveFromComputedStrips } from "./weave.mjs?v=20260709-layered-richardson";
 import {
   cycleColor,
   renderClusterVariableAnswerPanel,
   renderInteractiveWeaveViewer,
   renderQuiverAnswerPanel,
-} from "./render.mjs?v=20260708-richardson-layered-fix19";
+} from "./render.mjs?v=20260709-layered-richardson";
 
 const form = document.querySelector("#input-form");
 const rankInput = document.querySelector("#rank-input");
 const wInput = document.querySelector("#w-input");
 const vInput = document.querySelector("#v-input");
+const vcInput = document.querySelector("#vc-input");
 const layerInput = document.querySelector("#layer-input");
 const layerOutput = document.querySelector("#layer-output");
 const output = document.querySelector("#output");
 const errorBox = document.querySelector("#error-box");
-const exampleA2Button = document.querySelector("#example-a2-button");
-const exampleA3Button = document.querySelector("#example-a3-button");
+const photoExampleButton = document.querySelector("#photo-example-button");
+const smallExampleButton = document.querySelector("#small-example-button");
 
 const examples = {
-  a2: {
+  photo: {
+    rank: "3",
+    w: "2 3 1 2 1",
+    v: "2 1",
+    vc: "",
+  },
+  small: {
     rank: "2",
     w: "1 2 1",
     v: "2",
-  },
-  a3: {
-    rank: "3",
-    w: "1 2 1 3 2",
-    v: "3",
+    vc: "",
   },
 };
 
 let currentData = null;
-let currentT = 0;
+let currentLayer = 0;
 let currentActiveLayer = 0;
 
 function el(tag, className = "", text = "") {
@@ -49,10 +52,6 @@ function htmlEl(tag, className = "", html = "") {
   return node;
 }
 
-function svgEl(tag) {
-  return document.createElementNS("http://www.w3.org/2000/svg", tag);
-}
-
 function subscriptNumber(value) {
   const subscripts = new Map([
     ["0", "₀"],
@@ -67,14 +66,6 @@ function subscriptNumber(value) {
     ["9", "₉"],
   ]);
   return String(value).replace(/[0-9]/g, (digit) => subscripts.get(digit) ?? digit);
-}
-
-function ricStringLabel(t) {
-  return `sᴸ_Ric(t=${t})`;
-}
-
-function ricWeaveLabel(t) {
-  return `𝒲ᴸ_Ric(t=${t})`;
 }
 
 function parsePositiveInteger(text, name) {
@@ -110,14 +101,6 @@ function multiplyActions(left, right) {
   return right.map((value) => left[value - 1]);
 }
 
-function inverseAction(action) {
-  const out = Array(action.length);
-  action.forEach((value, idx) => {
-    out[value - 1] = idx + 1;
-  });
-  return out;
-}
-
 function actionOfWord(word, rank) {
   const size = rank + 1;
   let out = identityAction(size);
@@ -127,12 +110,16 @@ function actionOfWord(word, rank) {
   return out;
 }
 
-function sameAction(left, right) {
-  return left.length === right.length && left.every((value, idx) => value === right[idx]);
+function leftMultiplyAction(generator, action, rank) {
+  return multiplyActions(simpleReflectionAction(generator, rank + 1), action);
 }
 
-function actionKey(action) {
-  return action.join(",");
+function rightMultiplyAction(action, generator, rank) {
+  return multiplyActions(action, simpleReflectionAction(generator, rank + 1));
+}
+
+function sameAction(left, right) {
+  return left.length === right.length && left.every((value, idx) => value === right[idx]);
 }
 
 function longestAction(rank) {
@@ -167,10 +154,6 @@ function reducedWordForAction(action) {
   return word.reverse();
 }
 
-function sameCoxeterElement(leftWord, rightWord, rank) {
-  return sameAction(actionOfWord(leftWord, rank), actionOfWord(rightWord, rank));
-}
-
 function isReducedTypeAWord(word, rank) {
   return coxeterLengthOfAction(actionOfWord(word, rank)) === word.length;
 }
@@ -179,398 +162,481 @@ function textWord(word) {
   return word.length === 0 ? "e" : word.join("");
 }
 
-function displayWordFromIndexedPrefix(word, t = word.length) {
-  return word.slice(0, t);
+function spacedWord(word) {
+  return word.length === 0 ? "e" : word.join(" ");
 }
 
-function combinationsOfSize(length, size) {
-  const out = [];
-  function visit(start, chosen) {
-    if (chosen.length === size) {
-      out.push(chosen.slice());
-      return;
-    }
-    for (let idx = start; idx <= length - (size - chosen.length) + 1; idx += 1) {
-      chosen.push(idx);
-      visit(idx + 1, chosen);
-      chosen.pop();
-    }
+function textSet(values) {
+  return `{${values.join(",")}}`;
+}
+
+function wordActionLabel(action) {
+  return textWord(reducedWordForAction(action));
+}
+
+function vcActionFor(vWord, rank) {
+  return multiplyActions(longestAction(rank), actionOfWord(vWord, rank));
+}
+
+function computedVcWord(vWord, rank) {
+  return reducedWordForAction(vcActionFor(vWord, rank));
+}
+
+function validateVcWord(vcWord, vWord, rank) {
+  if (!isReducedTypeAWord(vcWord, rank)) throw new Error("β(v^c) must be reduced.");
+  const expected = vcActionFor(vWord, rank);
+  const actual = actionOfWord(vcWord, rank);
+  if (!sameAction(actual, expected)) {
+    throw new Error("The entered β(v^c) does not represent w_0 v.");
   }
-  visit(1, []);
-  return out;
 }
 
-function rightmostRepresentativePositions({ vWord, indexedWord, rank }) {
-  if (vWord.length === 0) return { positions: [], word: [] };
-  for (const positions of combinationsOfSize(indexedWord.length, vWord.length).reverse()) {
-    const displayedSubword = positions.map((position) => indexedWord[position - 1]);
-    if (sameCoxeterElement(displayedSubword, vWord, rank)) {
-      return { positions, word: displayedSubword };
-    }
+function buildGreedySequence({ rank, wWord, vWord }) {
+  let current = actionOfWord(vWord, rank);
+  const rows = [{
+    index: 1,
+    action: current.slice(),
+    word: reducedWordForAction(current),
+  }];
+  const steps = [];
+  const tVector = [];
+  const freePositions = [];
+  const usedPositions = [];
+
+  wWord.forEach((generator, idx) => {
+    const k = idx + 1;
+    const before = current.slice();
+    const candidate = rightMultiplyAction(current, generator, rank);
+    const beforeLength = coxeterLengthOfAction(before);
+    const candidateLength = coxeterLengthOfAction(candidate);
+    const used = candidateLength < beforeLength;
+    const next = used ? candidate : before;
+    const t = used ? 0 : 1;
+    if (t === 1) freePositions.push(k);
+    else usedPositions.push(k);
+    tVector.push(t);
+    steps.push({
+      k,
+      generator,
+      before,
+      beforeWord: reducedWordForAction(before),
+      candidate,
+      candidateWord: reducedWordForAction(candidate),
+      beforeLength,
+      candidateLength,
+      relation: candidateLength > beforeLength ? ">" : "<",
+      used,
+      t,
+      next,
+      nextWord: reducedWordForAction(next),
+    });
+    current = next;
+    rows.push({
+      index: k + 1,
+      action: current.slice(),
+      word: reducedWordForAction(current),
+    });
+  });
+
+  if (coxeterLengthOfAction(current) !== 0) {
+    throw new Error("The greedy left sequence did not end at e. Check that v <= w for the entered β(w).");
   }
-  throw new Error("No CGGLS rightmost representative of v was found in the indexed word.");
+
+  return {
+    rows,
+    steps,
+    tVector,
+    freePositions,
+    usedPositions,
+  };
 }
 
-function starGeneratorTypeA(generator, rank) {
-  return rank + 1 - generator;
+function buildLayeredPath({ rank, wWord, greedy }) {
+  const steps = [{
+    a: 0,
+    originalK: null,
+    generator: null,
+    tau: null,
+    wWord: [],
+    vWord: [],
+    wAction: identityAction(rank + 1),
+    vAction: identityAction(rank + 1),
+  }];
+  let wLayerWord = [];
+  let vLayerWord = [];
+  let wAction = identityAction(rank + 1);
+  let vAction = identityAction(rank + 1);
+
+  for (let a = 1; a <= wWord.length; a += 1) {
+    const originalK = wWord.length - a + 1;
+    const generator = wWord[originalK - 1];
+    const tau = greedy.tVector[originalK - 1];
+    wLayerWord = [generator, ...wLayerWord];
+    wAction = leftMultiplyAction(generator, wAction, rank);
+    if (tau === 0) {
+      vLayerWord = [...vLayerWord, generator];
+      vAction = rightMultiplyAction(vAction, generator, rank);
+    }
+    steps.push({
+      a,
+      originalK,
+      generator,
+      tau,
+      wWord: wLayerWord.slice(),
+      vWord: vLayerWord.slice(),
+      wAction: wAction.slice(),
+      vAction: vAction.slice(),
+    });
+  }
+
+  return steps;
 }
 
-function starWord(word, rank) {
-  return word.map((generator) => starGeneratorTypeA(generator, rank));
-}
-
-function complementWordForVStar(vStarWord, rank) {
-  const complementAction = multiplyActions(longestAction(rank), inverseAction(actionOfWord(vStarWord, rank)));
-  return reducedWordForAction(complementAction);
-}
-
-function makeLeftRichardsonDoubleString({ vcWord, indexedWord, plusPositions }) {
-  const plusSet = new Set(plusPositions);
+function makeAllRightDoubleString({ vcWord, wWord, startOriginalK, tVector }) {
   return [
-    ...vcWord.slice().reverse().map((generator, idx) => ({
+    ...vcWord.map((generator, idx) => ({
       source: "vc",
       block: "v^c",
-      t: vcWord.length - idx,
+      vcPosition: idx + 1,
       h: generator,
-      side: "L",
-      plus: true,
+      side: "R",
+      plus: false,
     })),
-    ...indexedWord.slice().reverse().map((generator, idx) => {
-      const position = indexedWord.length - idx;
+    ...wWord.map((generator, idx) => {
+      const originalK = startOriginalK + idx;
+      const tau = tVector[originalK - 1];
       return {
-        source: plusSet.has(position) ? "w-plus" : "w-free",
+        source: tau === 1 ? "w-free" : "w-used",
         block: "w",
-        t: position,
-        wPosition: position,
+        originalK,
+        layer: tVector.length - originalK + 1,
+        tau,
         h: generator,
-        side: "L",
-        plus: plusSet.has(position),
+        side: "R",
+        plus: false,
       };
     }),
   ].map((entry, idx) => ({ ...entry, step: idx + 1 }));
 }
 
-function buildPartialRichardsonData({ rank, indexedWord, plusPositions }, t) {
-  const partialWord = indexedWord.slice(0, t);
-  const partialPlusPositions = plusPositions.filter((position) => position <= t);
-  const partialVWord = partialPlusPositions.map((position) => indexedWord[position - 1]);
-  const vStarWord = starWord(partialVWord, rank);
-  const vcWord = complementWordForVStar(vStarWord, rank);
-  const doubleString = makeLeftRichardsonDoubleString({
-    vcWord,
-    indexedWord: partialWord,
-    plusPositions: partialPlusPositions,
-  });
-  return {
-    t,
-    indexedWord: partialWord,
-    displayW: displayWordFromIndexedPrefix(indexedWord, t),
-    vWord: partialVWord,
-    vStarWord,
-    vcWord,
-    plusPositions: partialPlusPositions,
-    doubleString,
-  };
+function wordKey(word) {
+  return word.join(",");
 }
 
-function pathStepLabel(step) {
-  return `(${textWord(step.displayW)}, ${textWord(step.vWord)})`;
+function coxeterBraidLengthTypeA(left, right) {
+  if (left === right) return 1;
+  return Math.abs(left - right) === 1 ? 3 : 2;
 }
 
-function buildPathData({ rank, indexedWord, vWord }) {
-  if (indexedWord.length === 0) throw new Error("The word for w must be nonempty.");
-  if (!isReducedTypeAWord(displayWordFromIndexedPrefix(indexedWord), rank)) {
-    throw new Error("The displayed word s_{i_l}...s_{i_1} must be reduced.");
-  }
-  if (!isReducedTypeAWord(vWord, rank)) throw new Error("v must be entered as a reduced word.");
-  const rightmost = rightmostRepresentativePositions({ vWord, indexedWord, rank });
-  const plusPositions = rightmost.positions;
-  const steps = Array.from({ length: indexedWord.length + 1 }, (_, t) => buildPartialRichardsonData({
-    rank,
-    indexedWord,
-    plusPositions,
-  }, t));
-  const edges = indexedWord.map((generator, idx) => {
-    const t = idx + 1;
-    const caseType = plusPositions.includes(t) ? "case1" : "case2";
-    return {
-      t,
-      generator,
-      caseType,
-      color: caseType === "case1" ? "blue" : "red",
-      from: steps[t - 1],
-      to: steps[t],
-    };
-  });
-  const final = steps[steps.length - 1];
-  return {
-    rank,
-    indexedWord,
-    displayW: displayWordFromIndexedPrefix(indexedWord),
-    inputVWord: vWord,
-    rightmost,
-    plusPositions,
-    freePositions: indexedWord.map((_, idx) => idx + 1).filter((position) => !plusPositions.includes(position)),
-    steps,
-    edges,
-    final,
-  };
-}
-
-function renderFacts(data, t) {
-  const partial = data.steps[t];
-  const card = el("section", "card layered-facts-card");
-  card.appendChild(el("h2", "", "Richardson Prefix Data"));
-
-  function appendSection(title, rows) {
-    const section = el("section", "layered-data-section");
-    section.appendChild(el("h3", "", title));
-    const grid = el("div", "ric-data-grid layered-data-grid");
-    rows.forEach(([label, value]) => {
-      const row = el("div", "ric-data-row");
-      row.append(el("span", "ric-data-key", label), el("span", "formula ric-data-value", value));
-      grid.appendChild(row);
-    });
-    section.appendChild(grid);
-    card.appendChild(section);
-  }
-
-  appendSection("Input", [
-    ["type", `A${subscriptNumber(data.rank)}`],
-    ["β(w)", textWord(data.displayW)],
-    ["v", textWord(data.inputVWord)],
-  ]);
-
-  appendSection("Representative", [
-    ["P_Ric", `{${data.plusPositions.join(", ")}}`],
-    ["M_Ric", `{${data.freePositions.join(", ")}}`],
-  ]);
-
-  appendSection("Current Prefix", [
-    ["t", String(t)],
-    ["β(wₜ)", textWord(partial.displayW)],
-    ["vₜ", textWord(partial.vWord)],
-    ["β(vₜᶜ)", textWord(partial.vcWord)],
-  ]);
-
-  const details = el("details", "layered-data-details");
-  details.appendChild(el("summary", "", "Auxiliary data"));
-  const detailGrid = el("div", "ric-data-grid layered-data-grid");
-  [
-    ["β(vₜ*)", textWord(partial.vStarWord)],
-    ["(wₜ,vₜ)", pathStepLabel(partial)],
-  ].forEach(([label, value]) => {
-    const row = el("div", "ric-data-row");
-    row.append(el("span", "ric-data-key", label), el("span", "formula ric-data-value", value));
-    detailGrid.appendChild(row);
-  });
-  details.appendChild(detailGrid);
-  card.appendChild(details);
-
-  const note = el("p", "small-note");
-  note.textContent = "P_Ric positions are length-additive (+); M_Ric positions create the trivalent vertices.";
-  card.appendChild(note);
-  return card;
-}
-
-function generateAllActions(rank) {
-  const size = rank + 1;
+function braidNeighborsTypeA(word) {
   const out = [];
-  function visit(prefix, remaining) {
-    if (remaining.length === 0) {
-      out.push(prefix.slice());
-      return;
+  for (let pos = 0; pos < word.length - 1; pos += 1) {
+    const left = word[pos];
+    const right = word[pos + 1];
+    if (left !== right && coxeterBraidLengthTypeA(left, right) === 2) {
+      out.push({
+        word: [...word.slice(0, pos), right, left, ...word.slice(pos + 2)],
+        move: { type: "tetra", pos },
+      });
     }
-    remaining.forEach((value, idx) => {
-      prefix.push(value);
-      visit(prefix, [...remaining.slice(0, idx), ...remaining.slice(idx + 1)]);
-      prefix.pop();
-    });
   }
-  visit([], identityAction(size));
+  for (let pos = 0; pos < word.length - 2; pos += 1) {
+    const left = word[pos];
+    const middle = word[pos + 1];
+    const right = word[pos + 2];
+    if (left === right && coxeterBraidLengthTypeA(left, middle) === 3) {
+      out.push({
+        word: [...word.slice(0, pos), middle, left, middle, ...word.slice(pos + 3)],
+        move: { type: "hexa", pos },
+      });
+    }
+  }
   return out;
 }
 
-function rightWeakInterval(data) {
-  const fullAction = actionOfWord(data.displayW, data.rank);
-  const fullLength = coxeterLengthOfAction(fullAction);
-  const all = generateAllActions(data.rank);
-  const nodes = all
-    .map((action) => ({ action, key: actionKey(action), length: coxeterLengthOfAction(action) }))
-    .filter((node) => {
-      if (node.length > fullLength) return false;
-      const quotient = multiplyActions(inverseAction(node.action), fullAction);
-      return coxeterLengthOfAction(quotient) === fullLength - node.length;
-    });
-  const nodeMap = new Map(nodes.map((node) => [node.key, node]));
-  const edges = [];
-  nodes.forEach((node) => {
-    for (let generator = 1; generator <= data.rank; generator += 1) {
-      const nextAction = multiplyActions(node.action, simpleReflectionAction(generator, data.rank + 1));
-      const nextKey = actionKey(nextAction);
-      const next = nodeMap.get(nextKey);
-      if (!next || next.length !== node.length + 1) continue;
-      edges.push({ source: node.key, target: nextKey, generator });
-    }
-  });
-  return { nodes, edges, nodeMap };
+function reconstructBraidPath(targetKey, records) {
+  const words = [];
+  const moves = [];
+  let cursor = targetKey;
+  while (cursor !== null) {
+    const record = records.get(cursor);
+    words.push(record.word.slice());
+    if (record.move !== null) moves.push(record.move);
+    cursor = record.parent;
+  }
+  words.reverse();
+  moves.reverse();
+  return { words, moves };
 }
 
-function renderWeakInterval(data, t, onSelectLayer) {
-  const pathActions = data.steps.map((step) => actionOfWord(step.displayW, data.rank));
-  const pathKeys = pathActions.map(actionKey);
-  const pathEdgeByKey = new Map();
-  data.edges.forEach((edge, idx) => {
-    pathEdgeByKey.set(`${pathKeys[idx]}->${pathKeys[idx + 1]}`, edge);
-  });
-  const activeKey = pathKeys[t];
-  const interval = data.rank <= 5 ? rightWeakInterval(data) : null;
-  const pathOnly = !interval || interval.nodes.length > 96;
-  const nodes = pathOnly
-    ? pathActions.map((action, idx) => ({
-      action,
-      key: actionKey(action),
-      length: idx,
-      pathIndex: idx,
-    }))
-    : interval.nodes;
-  const edges = pathOnly
-    ? data.edges.map((edge, idx) => ({
-      source: pathKeys[idx],
-      target: pathKeys[idx + 1],
-      generator: edge.generator,
-    }))
-    : interval.edges;
-  const pathIndexByKey = new Map(pathKeys.map((key, idx) => [key, idx]));
-  const rows = new Map();
-  nodes.forEach((node) => {
-    if (!rows.has(node.length)) rows.set(node.length, []);
-    rows.get(node.length).push(node);
-  });
-  const sortedLengths = Array.from(rows.keys()).sort((a, b) => a - b);
-  const rowGap = 84;
-  const width = 920;
-  const height = Math.max(220, 78 + (sortedLengths.length - 1) * rowGap);
-  const positions = new Map();
-  sortedLengths.forEach((length, rowIdx) => {
-    const row = rows.get(length).sort((left, right) => {
-      const leftPath = pathIndexByKey.has(left.key) ? pathIndexByKey.get(left.key) : 999;
-      const rightPath = pathIndexByKey.has(right.key) ? pathIndexByKey.get(right.key) : 999;
-      if (leftPath !== rightPath) return leftPath - rightPath;
-      return left.key.localeCompare(right.key);
-    });
-    const y = 38 + rowIdx * rowGap;
-    row.forEach((node, idx) => {
-      const x = width / 2 + (idx - (row.length - 1) / 2) * Math.min(116, 760 / Math.max(row.length - 1, 1));
-      positions.set(node.key, { x, y });
-    });
-  });
+function braidPathBetweenWordsTypeA(startWord, targetWord) {
+  const startKey = wordKey(startWord);
+  const targetKey = wordKey(targetWord);
+  if (startKey === targetKey) return { words: [startWord.slice()], moves: [] };
 
-  const svg = svgEl("svg");
-  svg.setAttribute("class", "layered-weak-svg");
-  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  svg.setAttribute("role", "img");
+  const queue = [startWord.slice()];
+  const records = new Map([[startKey, {
+    parent: null,
+    move: null,
+    word: startWord.slice(),
+  }]]);
+  const maxVisited = Math.max(12000, 4000 * startWord.length);
 
-  edges.forEach((edge) => {
-    const source = positions.get(edge.source);
-    const target = positions.get(edge.target);
-    if (!source || !target) return;
-    const pathEdge = pathEdgeByKey.get(`${edge.source}->${edge.target}`);
-    const line = svgEl("line");
-    line.setAttribute("x1", String(source.x));
-    line.setAttribute("y1", String(source.y + 16));
-    line.setAttribute("x2", String(target.x));
-    line.setAttribute("y2", String(target.y - 16));
-    line.setAttribute("class", pathEdge ? `layered-weak-edge path-edge ${pathEdge.caseType}` : "layered-weak-edge");
-    svg.appendChild(line);
-    if (pathEdge) {
-      const label = svgEl("text");
-      label.setAttribute("x", String((source.x + target.x) / 2 + 8));
-      label.setAttribute("y", String((source.y + target.y) / 2 - 5));
-      label.setAttribute("class", `layered-edge-label ${pathEdge.caseType}`);
-      label.textContent = `i=${edge.generator}`;
-      svg.appendChild(label);
+  for (let cursor = 0; cursor < queue.length; cursor += 1) {
+    if (records.size > maxVisited) break;
+    const word = queue[cursor];
+    for (const neighbor of braidNeighborsTypeA(word)) {
+      const neighborKey = wordKey(neighbor.word);
+      if (records.has(neighborKey)) continue;
+      records.set(neighborKey, {
+        parent: wordKey(word),
+        move: neighbor.move,
+        word: neighbor.word.slice(),
+      });
+      if (neighborKey === targetKey) return reconstructBraidPath(targetKey, records);
+      queue.push(neighbor.word);
     }
-  });
+  }
 
-  nodes.forEach((node) => {
-    const pos = positions.get(node.key);
-    if (!pos) return;
-    const pathIndex = pathIndexByKey.get(node.key);
-    const group = svgEl("g");
-    group.setAttribute("class", [
-      "layered-weak-node-group",
-      pathIndex !== undefined ? "on-path" : "",
-      node.key === activeKey ? "active" : "",
-    ].filter(Boolean).join(" "));
-    if (pathIndex !== undefined) {
-      group.style.cursor = "pointer";
-      group.addEventListener("click", () => onSelectLayer(pathIndex));
-    }
-    const circle = svgEl("circle");
-    circle.setAttribute("cx", String(pos.x));
-    circle.setAttribute("cy", String(pos.y));
-    circle.setAttribute("r", pathIndex !== undefined ? "18" : "13");
-    circle.setAttribute("class", "layered-weak-node");
-    const label = svgEl("text");
-    label.setAttribute("x", String(pos.x));
-    label.setAttribute("y", String(pos.y + 4));
-    label.setAttribute("class", "layered-weak-label");
-    label.textContent = pathIndex !== undefined
-      ? textWord(data.steps[pathIndex].displayW)
-      : textWord(reducedWordForAction(node.action));
-    group.append(circle, label);
-    svg.appendChild(group);
-  });
-
-  const wrap = el("div", "layered-weak-wrap");
-  const head = el("div", "layered-panel-head");
-  head.appendChild(el("h3", "", pathOnly ? "Prefix path" : "Prefix path in right weak order"));
-  head.appendChild(el("span", "small-note", pathOnly ? "Interval hidden for size; path is shown." : "Path nodes are highlighted."));
-  wrap.append(head, svg);
-  return wrap;
+  throw new Error(`Could not find a braid-only path from ${textWord(startWord)} to ${textWord(targetWord)}.`);
 }
 
-function renderLayerStack(data, t, activeLayer, onSelectActiveLayer) {
-  const wrap = el("div", "layered-stack-wrap");
-  const head = el("div", "layered-panel-head");
-  head.appendChild(el("h3", "", "Layers"));
-  head.appendChild(el("span", "small-note", "Click a card to highlight its actual CGGLS move block."));
-  wrap.appendChild(head);
-  const strip = el("div", "layered-stack");
-  data.edges.slice(0, t).reverse().forEach((edge) => {
-    const card = el("button", `layer-card ${edge.caseType}${edge.t === activeLayer ? " active" : ""}`);
-    card.type = "button";
-    card.addEventListener("click", () => onSelectActiveLayer(edge.t));
-    card.appendChild(el("span", "layer-card-kicker", `t=${edge.t}, i=${edge.generator}`));
-    card.appendChild(el("strong", "", edge.caseType === "case1" ? "Case 1" : "Case 2"));
-    card.appendChild(el("span", "", edge.caseType === "case1" ? "+ step, no local move" : "braid moves + trivalent"));
-    card.appendChild(el("span", "layer-card-pair", `${pathStepLabel(edge.from)} → ${pathStepLabel(edge.to)}`));
-    strip.appendChild(card);
-  });
-  const base = el("button", activeLayer === 0 ? "layer-card base active" : "layer-card base");
-  base.type = "button";
-  base.addEventListener("click", () => onSelectActiveLayer(0));
-  base.appendChild(el("span", "layer-card-kicker", "base"));
-  base.appendChild(el("strong", "", "(e,e)"));
-  base.appendChild(el("span", "", "empty prefix"));
-  strip.appendChild(base);
-  wrap.appendChild(strip);
-  return wrap;
+function firstAdjacentPair(word, generator) {
+  for (let pos = 0; pos < word.length - 1; pos += 1) {
+    if (word[pos] === generator && word[pos + 1] === generator) return pos;
+  }
+  return -1;
 }
 
-function computeLayerStrips(data, t, bottomWeave, activeLayer = t) {
+function findTrivalentLayerTypeA(topWord, bottomWord, generator) {
+  const startKey = wordKey(topWord);
+  const queue = [topWord.slice()];
+  const records = new Map([[startKey, {
+    parent: null,
+    move: null,
+    word: topWord.slice(),
+  }]]);
+  const maxVisited = Math.max(18000, 5000 * topWord.length);
+
+  for (let cursor = 0; cursor < queue.length; cursor += 1) {
+    if (records.size > maxVisited) break;
+    const word = queue[cursor];
+    const pairPos = firstAdjacentPair(word, generator);
+    if (pairPos >= 0) {
+      const postTriWord = [
+        ...word.slice(0, pairPos),
+        generator,
+        ...word.slice(pairPos + 2),
+      ];
+      try {
+        const beforeTri = reconstructBraidPath(wordKey(word), records);
+        const afterTri = braidPathBetweenWordsTypeA(postTriWord, bottomWord);
+        return {
+          words: [
+            ...beforeTri.words,
+            postTriWord,
+            ...afterTri.words.slice(1),
+          ],
+          moves: [
+            ...beforeTri.moves,
+            { type: "tri", pos: pairPos },
+            ...afterTri.moves,
+          ],
+          triMoveOffset: beforeTri.moves.length,
+        };
+      } catch {
+        // This adjacent pair does not lead to the required lower boundary.
+      }
+    }
+
+    for (const neighbor of braidNeighborsTypeA(word)) {
+      const neighborKey = wordKey(neighbor.word);
+      if (records.has(neighborKey)) continue;
+      records.set(neighborKey, {
+        parent: wordKey(word),
+        move: neighbor.move,
+        word: neighbor.word.slice(),
+      });
+      queue.push(neighbor.word);
+    }
+  }
+
+  throw new Error(`Could not build a trivalent layer ${textWord(topWord)} -> ${textWord(bottomWord)} for generator ${generator}.`);
+}
+
+function boundaryWordsForLayers({ rank, layer, pathSteps, overrideVcWord }) {
+  return pathSteps.slice(0, layer + 1).map((step) => {
+    const useOverride = step.a === pathSteps.length - 1 && overrideVcWord !== null;
+    const vcWord = useOverride ? overrideVcWord.slice() : computedVcWord(step.vWord, rank);
+    return [...vcWord, ...step.wWord];
+  });
+}
+
+function buildLayeredRightInductiveWeave({ rank, dynkin, layer, pathSteps, tVector, wWord, overrideVcWord, doubleString }) {
+  const boundaries = boundaryWordsForLayers({ rank, layer, pathSteps, overrideVcWord });
+  const words = [boundaries[layer].slice()];
+  const moves = [];
+  const stepInfos = [];
+  let clusterCount = 0;
+
+  for (let a = layer; a >= 1; a -= 1) {
+    const step = pathSteps[a];
+    const topWord = words[words.length - 1];
+    const bottomWord = boundaries[a - 1];
+    if (wordKey(topWord) !== wordKey(boundaries[a])) {
+      throw new Error(`Internal layer mismatch at a=${a}: expected top boundary ${textWord(boundaries[a])}, got ${textWord(topWord)}.`);
+    }
+
+    const layerPath = step.tau === 1
+      ? findTrivalentLayerTypeA(topWord, bottomWord, step.generator)
+      : braidPathBetweenWordsTypeA(topWord, bottomWord);
+
+    if (layerPath.moves.length === 0) {
+      moves.push({
+        type: "straight",
+        pos: 0,
+        sourceStep: a,
+        entryLabel: `${step.generator}R`,
+        originalK: step.originalK,
+        tau: step.tau,
+        block: "w",
+      });
+      words.push(words[words.length - 1].slice());
+      continue;
+    }
+
+    let triMoveIndex = null;
+    layerPath.moves.forEach((move, idx) => {
+      const globalMoveIndex = moves.length;
+      if (move.type === "tri") triMoveIndex = globalMoveIndex;
+      moves.push({
+        ...move,
+        sourceStep: a,
+        entryLabel: `${step.generator}R`,
+        originalK: step.originalK,
+        tau: step.tau,
+        block: "w",
+      });
+      words.push(layerPath.words[idx + 1].slice());
+    });
+
+    if (step.tau === 1) {
+      clusterCount += 1;
+      stepInfos.push({
+        step: a,
+        absoluteStep: null,
+        entryLabel: `${step.generator}R`,
+        generator: step.generator,
+        side: "R",
+        plus: false,
+        clusterVariable: `A${clusterCount}`,
+        triMoveIndex,
+        bottomReducedWordAfterStep: bottomWord.slice(),
+        originalK: step.originalK,
+        tau: step.tau,
+        block: "w",
+        source: "w-free",
+      });
+    }
+  }
+
+  return {
+    ...completeWeaveFromComputedStrips({
+      dynkin,
+      doubleString,
+      words,
+      moves,
+      stepInfos,
+    }, { coordinatePrefix: "z" }),
+    layerBoundaryWords: boundaries,
+  };
+}
+
+function buildPartialData(data, layer) {
+  const pathStep = data.pathSteps[layer];
+  const startOriginalK = data.wWord.length - layer + 1;
+  const finalLayer = layer === data.wWord.length;
+  const computedVc = computedVcWord(pathStep.vWord, data.rank);
+  const vcWord = finalLayer && data.overrideVcWord !== null ? data.overrideVcWord.slice() : computedVc;
+  const jWord = [...vcWord, ...pathStep.wWord];
+  const doubleString = makeAllRightDoubleString({
+    vcWord,
+    wWord: pathStep.wWord,
+    startOriginalK,
+    tVector: data.greedy.tVector,
+  });
+  const dynkin = createDynkinDatum({ family: "A", rank: data.rank });
+  const bottomWeave = buildLayeredRightInductiveWeave({
+    rank: data.rank,
+    dynkin,
+    layer,
+    pathSteps: data.pathSteps,
+    tVector: data.greedy.tVector,
+    wWord: data.wWord,
+    overrideVcWord: data.overrideVcWord,
+    doubleString,
+  });
+  const normalizedDoubleString = doubleString.map((entry, idx) => ({
+    ...entry,
+    step: idx + 1,
+    plus: entry.block === "v^c" || entry.tau === 0,
+  }));
+  const layerStrips = computeLayerStrips({
+    bottomWeave,
+    doubleString: normalizedDoubleString,
+    layer,
+    activeLayer: data.activeLayer ?? layer,
+    tVector: data.greedy.tVector,
+    wWord: data.wWord,
+  });
+  const topBoundaryWord = Array.isArray(bottomWeave.words?.[0])
+    ? bottomWeave.words[0].slice()
+    : jWord.slice();
+  const topCoordinates = topBoundaryWord.map((_, idx) => `z${idx + 1}`);
+  const trace = {
+    mode: "layered-richardson",
+    family: "A",
+    dynkin,
+    rank: data.rank,
+    doubleString: normalizedDoubleString,
+    topWeave: {
+      words: [topBoundaryWord],
+      moves: [],
+      sourceWord: topBoundaryWord.slice(),
+      sourceCoordinates: topCoordinates,
+      coordinateRows: [topCoordinates],
+      coordinateSubstitution: {},
+    },
+    bottomWeave,
+    layerStrips,
+    fullClusterValues: bottomWeave.clusterValues ?? [],
+    fullClusterValuesOmitted: false,
+    junctionLabel: "s_{w,v}",
+    weaveTitle: `𝒲_layer(a=${layer})`,
+    weaveSubtitle: `All-right double string for v^c w^{(${layer})}.`,
+    quiverLabel: `Q(𝒲_layer(a=${layer}))`,
+    matrixLabel: `B(Q(𝒲_layer(a=${layer})))`,
+    variableHeader: `A_t = A_t(𝒲_layer(a=${layer}))`,
+  };
+
+  return {
+    layer,
+    pathStep,
+    startOriginalK,
+    computedVc,
+    vcWord,
+    jWord: topBoundaryWord,
+    doubleString: normalizedDoubleString,
+    trace,
+  };
+}
+
+function computeLayerStrips({ bottomWeave, layer, activeLayer, tVector, wWord }) {
   const moves = bottomWeave.moves ?? [];
   const stepInfoByTriMove = new Map(
     (bottomWeave.stepInfos ?? [])
       .filter((info) => Number.isInteger(info.triMoveIndex))
       .map((info) => [info.triMoveIndex, info]),
-  );
-  const sourceStepByLayer = new Map(
-    (bottomWeave.doubleString ?? [])
-      .map((entry, idx) => ({ entry, sourceStep: idx + 1 }))
-      .filter(({ entry }) => entry.block === "w" && Number.isInteger(entry.wPosition))
-      .map(({ entry, sourceStep }) => [entry.wPosition, sourceStep]),
   );
   const moveIndicesBySourceStep = new Map();
   moves.forEach((move, moveIdx) => {
@@ -578,70 +644,203 @@ function computeLayerStrips(data, t, bottomWeave, activeLayer = t) {
     if (!moveIndicesBySourceStep.has(move.sourceStep)) moveIndicesBySourceStep.set(move.sourceStep, []);
     moveIndicesBySourceStep.get(move.sourceStep).push(moveIdx);
   });
-  function emptyAnchorForSourceStep(sourceStep) {
-    if (!Number.isInteger(sourceStep)) return 0;
-    const nextMoveIdx = moves.findIndex((move) => Number.isInteger(move.sourceStep) && move.sourceStep > sourceStep);
-    return nextMoveIdx === -1 ? moves.length : nextMoveIdx;
-  }
+
   const strips = [];
-
-  for (let layer = t; layer >= 1; layer -= 1) {
-    const edge = data.edges[layer - 1];
-    const sourceStep = sourceStepByLayer.get(layer);
-    const moveIndices = moveIndicesBySourceStep.get(sourceStep) ?? [];
-    const startMove = moveIndices.length > 0 ? Math.min(...moveIndices) : emptyAnchorForSourceStep(sourceStep);
+  for (let a = layer; a >= 1; a -= 1) {
+    const originalK = wWord.length - a + 1;
+    const moveIndices = moveIndicesBySourceStep.get(a) ?? [];
+    const startMove = moveIndices.length > 0 ? Math.min(...moveIndices) : moves.length;
     const endMove = moveIndices.length > 0 ? Math.max(...moveIndices) + 1 : startMove;
-
-    if (endMove <= startMove) {
-      strips.push({
-        layer,
-        startMove,
-        endMove,
-        caseType: edge?.caseType ?? "",
-        generator: edge?.generator ?? null,
-        active: layer === activeLayer,
-        clusterLabels: [],
-        label: `t=${layer}${edge ? `, i=${edge.generator}` : ""}`,
-        empty: true,
-      });
-      continue;
-    }
-
+    const tau = tVector[originalK - 1];
     const clusterLabels = [];
     for (let moveIdx = startMove; moveIdx < endMove; moveIdx += 1) {
       const info = stepInfoByTriMove.get(moveIdx);
       if (info?.clusterVariable) clusterLabels.push(info.clusterVariable);
     }
-
     strips.push({
-      layer,
+      layer: a,
       startMove,
       endMove,
-      caseType: edge?.caseType ?? "",
-      generator: edge?.generator ?? null,
-      active: layer === activeLayer,
+      caseType: tau === 1 ? "case2" : "case1",
+      generator: wWord[originalK - 1],
+      active: a === activeLayer,
       clusterLabels,
-      label: `t=${layer}${edge ? `, i=${edge.generator}` : ""}`,
+      label: `a=${a}, k=${originalK}, i=${wWord[originalK - 1]}, t=${tau}`,
+      empty: endMove <= startMove,
     });
   }
-
   return strips;
 }
 
-function renderRecursiveWeaveCard(data, t, activeLayer) {
-  const card = el("section", "card layered-main-weave-card");
-  card.appendChild(htmlEl("h2", "", `𝒲<sub>Ric</sub><sup>L</sup>(t=${t})`));
-  const subtitle = el("p", "card-subtitle");
-  subtitle.textContent = "CGGLS left-inductive weave for the current prefix.";
-  card.appendChild(subtitle);
-  const trace = buildTrace(data, t, { diagnostic: false, activeLayer });
-  card.appendChild(renderLayeredSeedPanels(trace));
+function chipForEntry(entry) {
+  const chip = el("span", [
+    "double-string-chip",
+    entry.block === "v^c" ? "prefix" : "chain",
+    entry.source === "w-free" ? "side-r reverse-free" : "",
+    entry.source === "w-used" ? "side-l reverse-used" : "",
+  ].filter(Boolean).join(" "));
+  chip.textContent = `${entry.h}R${entry.plus ? "+" : ""}`;
+  if (entry.block === "v^c") {
+    chip.title = `v^c letter ${entry.vcPosition}; ${entry.plus ? "length-increasing (+)" : "trivalent step"}`;
+  } else {
+    chip.title = `w-position k=${entry.originalK}, layer a=${entry.layer}, t_k=${entry.tau}; ${entry.plus ? "length-increasing (+)" : "trivalent step"}`;
+  }
+  return chip;
+}
+
+function renderDoubleStringChips(entries) {
+  const chips = el("div", "double-string-chips reverse-double-string-chips");
+  entries.forEach((entry) => chips.appendChild(chipForEntry(entry)));
+  return chips;
+}
+
+function renderConventionCard(data, partial) {
+  const card = el("section", "card reverse-convention-card");
+  card.appendChild(el("h2", "", "Convention"));
+  const formula = el("div", "gls-formula-box reverse-formula-box");
+  formula.appendChild(htmlEl("p", "", "<span class=\"formula\">v<sup>c</sup>=w<sub>0</sub>v</span>."));
+  formula.appendChild(htmlEl("p", "", "<span class=\"formula\">v<sup>c</sup>β(w)=(j<sub>1</sub>,...,j<sub>ℓ</sub>)</span>."));
+  formula.appendChild(htmlEl("p", "", "<span class=\"formula\">s<sub>w,v</sub>=(j<sub>1</sub>R,...,j<sub>ℓ</sub>R)</span>."));
+  formula.appendChild(htmlEl("p", "", "The page draws the right inductive weave attached to the all-right double string."));
+  formula.appendChild(htmlEl("p", "", "The greedy sequence uses <span class=\"formula\">v<sub>≥k</sub>s<sub>iₖ</sub></span>, so all multiplications on the <span class=\"formula\">v</span>-side are right multiplications."));
+  card.appendChild(formula);
+
+  const grid = el("div", "ric-data-grid layered-data-grid reverse-facts-grid");
+  [
+    ["type", `A${subscriptNumber(data.rank)}`],
+    ["β(w)", textWord(data.wWord)],
+    ["v", textWord(data.vWord)],
+    ["current layer", `a=${partial.layer}`],
+    ["wᵃ", textWord(partial.pathStep.wWord)],
+    ["vᵃ", textWord(partial.pathStep.vWord)],
+    ["β((vᵃ)ᶜ)", textWord(partial.vcWord)],
+    ["top boundary jᵃ", textWord(partial.jWord)],
+    ["[1,r]_v", textSet(data.greedy.freePositions)],
+    ["t", `(${data.greedy.tVector.join(",")})`],
+  ].forEach(([key, value]) => {
+    const row = el("div", "ric-data-row");
+    row.append(el("span", "ric-data-key", key), el("span", "formula ric-data-value", value));
+    grid.appendChild(row);
+  });
+  card.appendChild(grid);
+  if (data.overrideVcWord !== null && partial.layer !== data.wWord.length) {
+    card.appendChild(el("p", "small-note", "The optional β(v^c) is used only at the final layer. Intermediate layers use the computed representative of w_0v^(a)."));
+  }
   return card;
 }
 
-function renderLayeredSeedPanels(trace) {
+function renderGreedyTable(data) {
+  const card = el("section", "card reverse-table-card");
+  card.appendChild(el("h2", "", "Greedy sequence v≥k"));
+  const table = el("table", "gls-data-table reverse-data-table");
+  const head = el("thead");
+  const headRow = el("tr");
+  ["k", "iₖ", "v≥k", "v≥k sᵢₖ", "comparison", "v≥k+1", "tₖ"].forEach((label) => headRow.appendChild(el("th", "", label)));
+  head.appendChild(headRow);
+  table.appendChild(head);
+  const body = el("tbody");
+  data.greedy.steps.forEach((step) => {
+    const tr = el("tr");
+    tr.appendChild(el("td", "formula", String(step.k)));
+    tr.appendChild(el("td", "formula", String(step.generator)));
+    tr.appendChild(el("td", "formula", textWord(step.beforeWord)));
+    tr.appendChild(el("td", "formula", textWord(step.candidateWord)));
+    tr.appendChild(el("td", step.used ? "reverse-used-cell" : "reverse-free-cell", `v s${subscriptNumber(step.generator)} ${step.relation} v`));
+    tr.appendChild(el("td", "formula", textWord(step.nextWord)));
+    tr.appendChild(el("td", step.t === 1 ? "reverse-free-cell" : "reverse-used-cell", String(step.t)));
+    body.appendChild(tr);
+  });
+  table.appendChild(body);
+  card.appendChild(table);
+  const note = el("p", "small-note");
+  note.textContent = "t_k=1 means v_{≥k}=v_{≥k+1}; t_k=0 means v_{≥k+1}=v_{≥k}s_{i_k}.";
+  card.appendChild(note);
+  return card;
+}
+
+function renderPathTable(data, layer) {
+  const card = el("section", "card reverse-path-card");
+  card.appendChild(el("h2", "", "Layered path"));
+  const table = el("table", "gls-data-table reverse-data-table");
+  const head = el("thead");
+  const headRow = el("tr");
+  ["a", "k", "hₐ", "τₐ=tₖ", "wᵃ", "vᵃ"].forEach((label) => headRow.appendChild(el("th", "", label)));
+  head.appendChild(headRow);
+  table.appendChild(head);
+  const body = el("tbody");
+  data.pathSteps.forEach((step) => {
+    const tr = el("tr");
+    if (step.a === layer) tr.classList.add("reverse-active-row");
+    tr.appendChild(el("td", "formula", String(step.a)));
+    tr.appendChild(el("td", "formula", step.originalK === null ? "-" : String(step.originalK)));
+    tr.appendChild(el("td", "formula", step.generator === null ? "-" : String(step.generator)));
+    tr.appendChild(el("td", step.tau === 1 ? "reverse-free-cell" : step.tau === 0 ? "reverse-used-cell" : "", step.tau === null ? "-" : String(step.tau)));
+    tr.appendChild(el("td", "formula", textWord(step.wWord)));
+    tr.appendChild(el("td", "formula", textWord(step.vWord)));
+    body.appendChild(tr);
+  });
+  table.appendChild(body);
+  card.appendChild(table);
+  return card;
+}
+
+function renderLayerCards(data, layer, activeLayer) {
+  const card = el("section", "card reverse-layer-card");
+  card.appendChild(el("h2", "", "Layers"));
+  const strip = el("div", "layered-stack reverse-layer-stack");
+  data.pathSteps.slice(1, layer + 1).reverse().forEach((step) => {
+    const button = el("button", [
+      "layer-card",
+      step.tau === 1 ? "case2" : "case1",
+      step.a === activeLayer ? "active" : "",
+    ].filter(Boolean).join(" "));
+    button.type = "button";
+    button.addEventListener("click", () => setActiveLayer(step.a));
+    button.appendChild(el("span", "layer-card-kicker", `a=${step.a}, k=${step.originalK}, i=${step.generator}`));
+    button.appendChild(el("strong", "", step.tau === 1 ? "t_k=1" : "t_k=0"));
+    button.appendChild(el("span", "", step.tau === 1 ? "v is unchanged in the greedy sequence" : "v is changed by right multiplication"));
+    button.appendChild(el("span", "layer-card-pair", `(${textWord(data.pathSteps[step.a - 1].wWord)},${textWord(data.pathSteps[step.a - 1].vWord)}) → (${textWord(step.wWord)},${textWord(step.vWord)})`));
+    strip.appendChild(button);
+  });
+  const base = el("button", activeLayer === 0 ? "layer-card base active" : "layer-card base");
+  base.type = "button";
+  base.addEventListener("click", () => setActiveLayer(0));
+  base.appendChild(el("span", "layer-card-kicker", "base"));
+  base.appendChild(el("strong", "", "(e,e)"));
+  base.appendChild(el("span", "", "empty layer"));
+  strip.appendChild(base);
+  card.appendChild(strip);
+  return card;
+}
+
+function renderCurrentDoubleString(partial) {
+  const card = el("section", "card reverse-string-card");
+  card.appendChild(el("h2", "", "Current all-right double string"));
+  const expression = el("div", "double-string-expression richardson-string-expression reverse-string-expression");
+  expression.appendChild(el("span", "formula", "sᵃ(w,v) = "));
+  expression.appendChild(renderDoubleStringChips(partial.doubleString));
+  card.appendChild(expression);
+  const note = el("p", "small-note");
+  note.textContent = "The + marks are the actual length-increasing steps of the right inductive weave. Colors still record the v^c block and the Richardson t_k data.";
+  card.appendChild(note);
+  const legend = el("div", "reverse-chip-legend");
+  [
+    ["prefix", "vᶜ block"],
+    ["reverse-used", "w block, tₖ=0"],
+    ["reverse-free", "w block, tₖ=1"],
+  ].forEach(([className, label]) => {
+    const item = el("span", "reverse-chip-legend-item");
+    item.appendChild(el("span", `reverse-chip-swatch ${className}`));
+    item.appendChild(el("span", "", label));
+    legend.appendChild(item);
+  });
+  card.appendChild(legend);
+  return card;
+}
+
+function renderSeedPanels(trace) {
   const cycleColors = new Map((trace.bottomWeave.lusztigCycles ?? []).map((cycle, idx) => [cycle.label, cycleColor(idx)]));
-  const panels = el("div", "layered-seed-panels");
+  const panels = el("div", "layered-seed-panels reverse-seed-panels");
   let selectedCluster = null;
 
   function syncSelection() {
@@ -660,6 +859,18 @@ function renderLayeredSeedPanels(trace) {
     syncSelection();
   }
 
+  const weavePanel = el("div", "answer-panel layered-edge-variable-panel reverse-weave-panel");
+  const header = el("div", "answer-panel-header");
+  header.appendChild(el("h3", "", "Weave"));
+  header.appendChild(el("div", "answer-panel-actions", "select an object"));
+  weavePanel.appendChild(header);
+  const note = el("p", "small-note");
+  note.textContent = "Bands mark Richardson layers in the right inductive weave. A t_k=1 layer contains the right-inductive braid path ending at a trivalent vertex; a t_k=0 layer is length-increasing.";
+  weavePanel.appendChild(note);
+  const viewer = renderInteractiveWeaveViewer(trace, { cycleColors });
+  viewer.classList.add("main-interactive-weave", "layered-edge-variable-viewer");
+  weavePanel.appendChild(viewer);
+
   const quiverPanel = renderQuiverAnswerPanel(trace.bottomWeave, cycleColors, selectCluster, null, {
     quiverLabel: trace.quiverLabel,
     matrixLabel: trace.matrixLabel,
@@ -668,106 +879,64 @@ function renderLayeredSeedPanels(trace) {
     weaveLabel: trace.weaveTitle,
     variableHeader: trace.variableHeader,
   });
-  const edgePanel = el("div", "answer-panel layered-edge-variable-panel");
-  const edgeHeader = el("div", "answer-panel-header");
-  edgeHeader.appendChild(el("h3", "", "Weave"));
-  edgeHeader.appendChild(el("div", "answer-panel-actions", "select an object"));
-  edgePanel.appendChild(edgeHeader);
-  const edgeNote = el("p", "small-note");
-  edgeNote.textContent = "Bands mark the move block attached to each prefix step. Case 2 blocks contain one trivalent vertex.";
-  edgePanel.appendChild(edgeNote);
-  const edgeViewer = renderInteractiveWeaveViewer(trace, { cycleColors });
-  edgeViewer.classList.add("main-interactive-weave", "layered-edge-variable-viewer");
-  edgePanel.appendChild(edgeViewer);
 
-  panels.append(edgePanel, quiverPanel, clusterPanel);
+  panels.append(weavePanel, quiverPanel, clusterPanel);
   syncSelection();
   return panels;
 }
 
-function renderCurrentDoubleString(data, t) {
-  const partial = data.steps[t];
-  const block = el("div", "layered-double-string");
-  block.appendChild(htmlEl("h3", "", `Current double string s<sub>Ric</sub><sup>L</sup>(t=${t})`));
-  const chips = el("div", "double-string-chips");
-  partial.doubleString.forEach((entry) => {
-    const chip = el("span", entry.source === "vc" ? "double-string-chip prefix" : "double-string-chip chain side-l");
-    chip.textContent = `${entry.h}${entry.side}${entry.plus ? "+" : ""}`;
-    chip.title = entry.source === "vc"
-      ? `β(vₜᶜ), position ${entry.t}`
-      : `i${subscriptNumber(entry.wPosition)}${entry.plus ? ", selected representative; + step with no trivalent vertex" : ", free trivalent layer"}`;
-    chips.appendChild(chip);
-  });
-  block.appendChild(chips);
-  return block;
-}
-
-function buildTrace(data, t, { diagnostic = true, activeLayer = t } = {}) {
-  const partial = data.steps[t];
-  const dynkin = createDynkinDatum({ family: "A", rank: data.rank });
-  const firstPass = buildDoubleInductiveWeave(partial.doubleString, dynkin, { coordinatePrefix: "z" });
-  const normalizedDoubleString = partial.doubleString.map((entry, idx) => ({
-    ...entry,
-    plus: firstPass.stepInfos[idx]?.plus ?? entry.plus,
-  }));
-  const bottomWeave = buildDoubleInductiveWeave(normalizedDoubleString, dynkin, { coordinatePrefix: "z" });
-  const layerStrips = computeLayerStrips(data, t, bottomWeave, activeLayer);
-  const topBoundaryWord = Array.isArray(bottomWeave.words?.[0])
-    ? bottomWeave.words[0].slice()
-    : normalizedDoubleString.map((entry) => entry.h);
-  const topCoordinates = topBoundaryWord.map((_, idx) => `z${idx + 1}`);
-  const weaveTitle = diagnostic ? `double-string diagnostic(t=${t})` : ricWeaveLabel(t);
-  return {
-    mode: "double-string",
-    family: "A",
-    dynkin,
-    rank: data.rank,
-    doubleString: normalizedDoubleString,
-    topWeave: {
-      words: [topBoundaryWord],
-      moves: [],
-      sourceWord: topBoundaryWord.slice(),
-      sourceCoordinates: topCoordinates,
-      coordinateRows: [topCoordinates],
-      coordinateSubstitution: {},
-    },
-    bottomWeave,
-    layerStrips,
-    fullClusterValues: bottomWeave.clusterValues ?? [],
-    fullClusterValuesOmitted: false,
-    doubleStringTitle: ricStringLabel(t),
-    junctionLabel: ricStringLabel(t),
-    weaveTitle,
-    weaveSubtitle: diagnostic
-      ? `Old renderer applied to the current double string for ${pathStepLabel(partial)}.`
-      : `Recursive top-stacked left Richardson weave for ${pathStepLabel(partial)}.`,
-    quiverLabel: diagnostic ? `Q(diagnostic(t=${t}))` : `Q(${ricWeaveLabel(t)})`,
-    matrixLabel: diagnostic ? `B(Q(diagnostic(t=${t})))` : `B(Q(${ricWeaveLabel(t)}))`,
-    variableHeader: diagnostic ? `Aₜ = Aₜ(diagnostic(t=${t}))` : `Aₜ = Aₜ(${ricWeaveLabel(t)})`,
-  };
-}
-
-function renderData(data, t, activeLayer = t) {
-  const root = el("div", "layered-richardson-view");
-  const top = el("div", "layered-top-grid");
-  top.appendChild(renderFacts(data, t));
-  const visualCard = el("section", "card layered-visual-card");
-  visualCard.append(
-    renderWeakInterval(data, t, setLayer),
-    renderLayerStack(data, t, activeLayer, setActiveLayer),
-    renderCurrentDoubleString(data, t),
+function renderData(data, layer, activeLayer = layer) {
+  data.activeLayer = activeLayer;
+  const partial = buildPartialData(data, layer);
+  const root = el("div", "layered-richardson-view reverse-richardson-view");
+  const top = el("div", "layered-top-grid reverse-top-grid");
+  top.appendChild(renderConventionCard(data, partial));
+  const right = el("div", "reverse-side-stack");
+  right.append(
+    renderGreedyTable(data),
+    renderPathTable(data, layer),
+    renderLayerCards(data, layer, activeLayer),
+    renderCurrentDoubleString(partial),
   );
-  top.appendChild(visualCard);
+  top.appendChild(right);
   root.appendChild(top);
-  root.appendChild(renderRecursiveWeaveCard(data, t, activeLayer));
+
+  const weaveCard = el("section", "card layered-main-weave-card reverse-main-weave-card");
+  weaveCard.appendChild(htmlEl("h2", "", `𝒲<sub>layer</sub>(a=${layer})`));
+  const subtitle = el("p", "card-subtitle");
+  subtitle.textContent = `Current stacked top boundary: j^${layer} = ${textWord(partial.jWord)}.`;
+  weaveCard.appendChild(subtitle);
+  weaveCard.appendChild(renderSeedPanels(partial.trace));
+  root.appendChild(weaveCard);
   output.replaceChildren(root);
 }
 
 function readDataInput() {
   const rank = parsePositiveInteger(rankInput.value, "rank");
-  const indexedWord = parseTypeAWord(wInput.value, "word for w", rank);
+  const wWord = parseTypeAWord(wInput.value, "β(w)", rank);
   const vWord = parseTypeAWord(vInput.value, "v", rank);
-  return buildPathData({ rank, indexedWord, vWord });
+  const overrideVcRaw = String(vcInput.value ?? "").trim();
+  const overrideVcWord = overrideVcRaw === "" ? null : parseTypeAWord(overrideVcRaw, "β(v^c)", rank);
+  if (wWord.length === 0) throw new Error("β(w) must be nonempty.");
+  if (!isReducedTypeAWord(wWord, rank)) throw new Error("β(w) must be reduced.");
+  if (!isReducedTypeAWord(vWord, rank)) throw new Error("v must be entered as a reduced word.");
+  if (overrideVcWord !== null) validateVcWord(overrideVcWord, vWord, rank);
+  const greedy = buildGreedySequence({ rank, wWord, vWord });
+  const pathSteps = buildLayeredPath({ rank, wWord, greedy });
+  if (!sameAction(pathSteps[pathSteps.length - 1].wAction, actionOfWord(wWord, rank))) {
+    throw new Error("The layered path did not end at w. Check β(w).");
+  }
+  if (!sameAction(pathSteps[pathSteps.length - 1].vAction, actionOfWord(vWord, rank))) {
+    throw new Error("The layered path did not end at v. Check the convention data.");
+  }
+  return {
+    rank,
+    wWord,
+    vWord,
+    overrideVcWord,
+    greedy,
+    pathSteps,
+  };
 }
 
 function setError(message) {
@@ -780,38 +949,39 @@ function clearError() {
   errorBox.hidden = true;
 }
 
-function syncSlider(data, t) {
+function syncSlider(data, layer) {
   layerInput.min = "0";
-  layerInput.max = String(data.indexedWord.length);
-  layerInput.value = String(t);
-  layerOutput.value = `t=${t}`;
-  layerOutput.textContent = `t=${t}`;
+  layerInput.max = String(data.wWord.length);
+  layerInput.value = String(layer);
+  layerOutput.value = `a=${layer}`;
+  layerOutput.textContent = `a=${layer}`;
+  vcInput.placeholder = computedVcWord(data.vWord, data.rank).join(" ");
 }
 
-function runConstruction(requestedT = null) {
+function runConstruction(requestedLayer = null) {
   try {
     clearError();
     const data = readDataInput();
     currentData = data;
-    const current = requestedT === null ? data.indexedWord.length : requestedT;
-    const t = Math.max(0, Math.min(data.indexedWord.length, Number.isFinite(current) ? current : data.indexedWord.length));
-    currentT = t;
-    currentActiveLayer = t;
-    syncSlider(data, t);
-    renderData(data, t, currentActiveLayer);
+    const rawLayer = requestedLayer === null ? data.wWord.length : requestedLayer;
+    const layer = Math.max(0, Math.min(data.wWord.length, Number.isFinite(rawLayer) ? rawLayer : data.wWord.length));
+    currentLayer = layer;
+    currentActiveLayer = layer;
+    syncSlider(data, layer);
+    renderData(data, layer, currentActiveLayer);
   } catch (error) {
     output.replaceChildren();
     currentData = null;
-    currentT = 0;
+    currentLayer = 0;
     currentActiveLayer = 0;
     setError(error instanceof Error ? error.message : String(error));
   }
 }
 
-function setLayer(t) {
-  if (!currentData) return runConstruction(t);
-  const next = Math.max(0, Math.min(currentData.indexedWord.length, t));
-  currentT = next;
+function setLayer(layer) {
+  if (!currentData) return runConstruction(layer);
+  const next = Math.max(0, Math.min(currentData.wWord.length, layer));
+  currentLayer = next;
   currentActiveLayer = next;
   syncSlider(currentData, next);
   renderData(currentData, next, currentActiveLayer);
@@ -819,14 +989,15 @@ function setLayer(t) {
 
 function setActiveLayer(layer) {
   if (!currentData) return;
-  currentActiveLayer = Math.max(0, Math.min(currentT, layer));
-  renderData(currentData, currentT, currentActiveLayer);
+  currentActiveLayer = Math.max(0, Math.min(currentLayer, layer));
+  renderData(currentData, currentLayer, currentActiveLayer);
 }
 
 function writeExample(example) {
   rankInput.value = example.rank;
   wInput.value = example.w;
   vInput.value = example.v;
+  vcInput.value = example.vc ?? "";
 }
 
 form.addEventListener("submit", (event) => {
@@ -838,24 +1009,15 @@ layerInput.addEventListener("input", () => {
   if (currentData) setLayer(Number(layerInput.value));
 });
 
-exampleA2Button.addEventListener("click", () => {
-  writeExample(examples.a2);
+photoExampleButton.addEventListener("click", () => {
+  writeExample(examples.photo);
   runConstruction();
 });
 
-exampleA3Button.addEventListener("click", () => {
-  writeExample(examples.a3);
+smallExampleButton.addEventListener("click", () => {
+  writeExample(examples.small);
   runConstruction();
 });
 
-function initialLayerFromUrl(defaultLayer) {
-  try {
-    const value = Number.parseInt(new URLSearchParams(window.location.search).get("t") ?? "", 10);
-    return Number.isInteger(value) ? value : defaultLayer;
-  } catch {
-    return defaultLayer;
-  }
-}
-
-writeExample(examples.a3);
-runConstruction(initialLayerFromUrl(examples.a3.w.split(/\s+/).filter(Boolean).length));
+writeExample(examples.photo);
+runConstruction();

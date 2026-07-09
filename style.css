@@ -4497,3 +4497,263 @@ h2 {
     grid-template-columns: 1fr;
   }
 }
+
+.gls-workspace {
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+}
+
+.gls-quiver-view {
+  display: grid;
+  gap: 16px;
+}
+
+.gls-summary-card,
+.gls-formula-card,
+.gls-table-card,
+.gls-weave-card,
+.gls-mismatch-card {
+  padding: 16px;
+}
+
+.gls-side-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.gls-side-column {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.gls-side-header {
+  display: grid;
+  gap: 4px;
+  padding: 0 2px;
+}
+
+.gls-side-header h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.gls-side-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.gls-formula-box {
+  display: grid;
+  gap: 7px;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  background: #fbfcfc;
+  padding: 12px;
+}
+
+.gls-formula-box p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.gls-facts-grid {
+  margin-top: 12px;
+}
+
+.gls-match-badge {
+  margin-top: 12px;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.gls-match-badge.ok {
+  border: 1px solid rgba(15, 107, 122, 0.25);
+  background: rgba(15, 107, 122, 0.08);
+  color: var(--accent-strong);
+}
+
+.gls-match-badge.bad {
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  background: rgba(220, 38, 38, 0.08);
+  color: #b4232b;
+}
+
+.gls-quiver-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+.gls-side-block,
+.gls-quiver-grid .quiver-answer-panel,
+.gls-side-column .quiver-answer-panel {
+  min-width: 0;
+}
+
+.gls-side-column .quiver-svg {
+  min-width: 620px;
+}
+
+.gls-weave-viewer {
+  margin-top: 10px;
+}
+
+.gls-weave-viewer.edge-label-viewer {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.gls-weave-viewer .edge-label-viewer-figure {
+  display: block;
+  min-width: 0;
+  overflow: visible;
+}
+
+.gls-weave-viewer .edge-label-viewer-svg {
+  width: 100%;
+  min-width: 0;
+}
+
+.gls-weave-viewer .edge-label-info {
+  position: static;
+  max-height: none;
+}
+
+.reverse-chip-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.reverse-chip-legend-item {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.reverse-chip-swatch {
+  width: 13px;
+  height: 13px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #edf4ff;
+}
+
+.reverse-chip-swatch.reverse-used {
+  background: #fff4d7;
+  border-color: #e1aa32;
+}
+
+.reverse-chip-swatch.reverse-free {
+  background: #e7f7f1;
+  border-color: #4aa982;
+}
+
+.gls-data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+}
+
+.gls-data-table th,
+.gls-data-table td {
+  border-bottom: 1px solid var(--soft-line);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.gls-data-table th {
+  background: #f6f8f8;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.gls-data-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.gls-frozen-cell {
+  color: var(--accent-strong);
+  font-weight: 850;
+}
+
+.gls-arrow-details {
+  margin-top: 12px;
+}
+
+.gls-arrow-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.gls-arrow-item {
+  display: grid;
+  grid-template-columns: minmax(76px, 0.22fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  border: 1px solid var(--soft-line);
+  border-radius: 7px;
+  background: #fff;
+  padding: 8px 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.gls-arrow-item.deleted {
+  background: #f8fafb;
+  color: #7b8992;
+}
+
+.gls-arrow-item.deleted .formula {
+  text-decoration: line-through;
+}
+
+.gls-mismatch-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.34fr) minmax(0, 1fr);
+  gap: 10px;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 9px 10px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+@media (max-width: 760px) {
+  .gls-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .gls-side-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gls-arrow-item,
+  .gls-mismatch-row {
+    grid-template-columns: 1fr;
+  }
+}

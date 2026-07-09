@@ -504,6 +504,9 @@ function applyMoveToCycleWeights(weights, move) {
     [out[p], out[p + 1]] = [out[p + 1], out[p]];
     return out;
   }
+  if (move.type === "straight") {
+    return out;
+  }
   if (move.type === "hexa") {
     const a1 = out[p];
     const a2 = out[p + 1];
@@ -1037,6 +1040,10 @@ function computeZRowsAndDashedRays(pinning, words, moves, uRows, stepInfos, coor
         rowz[p],
         ...rowz.slice(p + 2),
       ]);
+      return;
+    }
+    if (move.type === "straight") {
+      zRows.push(rowz.slice());
       return;
     }
     if (move.type === "tri") {
@@ -1952,6 +1959,50 @@ function placeholderClusterValues(stepInfos) {
       expression: "",
       expansionWarning: "Coordinate formulas are not implemented for this type.",
     }));
+}
+
+export function completeWeaveFromComputedStrips({
+  rank = null,
+  dynkin = null,
+  doubleString = [],
+  words,
+  moves,
+  stepInfos,
+}, options = {}) {
+  const datum = dynkin ?? createDynkinDatum({ family: "A", rank });
+  const coordinatePrefix = options.coordinatePrefix ?? "z";
+  const lusztigCycles = computeAllLusztigCycles(words, moves, stepInfos);
+  const uRows = computeURows(words, lusztigCycles);
+  const pinning = coordinatePinning(datum);
+  const coordinateAvailable = pinning.available && isSimplyLacedDatum(datum);
+  const { zRows, dashedRays } = coordinateAvailable
+    ? computeZRowsAndDashedRays(pinning, words, moves, uRows, stepInfos, coordinatePrefix)
+    : { zRows: placeholderZRows(words, coordinatePrefix), dashedRays: [] };
+  const clusterValues = coordinateAvailable
+    ? computeClusterValues(words, moves, uRows, zRows, stepInfos)
+    : placeholderClusterValues(stepInfos);
+  const quiverData = computeQuiverData(words, moves, lusztigCycles, dashedRays, datum);
+
+  return {
+    rank: datum.rank,
+    dynkin: datum,
+    coordinateAvailable,
+    pinningInfo: {
+      family: pinning.family,
+      group: pinning.group,
+      label: pinning.label,
+    },
+    doubleString,
+    words,
+    moves,
+    stepInfos,
+    lusztigCycles,
+    uRows,
+    zRows,
+    dashedRays,
+    clusterValues,
+    quiverData,
+  };
 }
 
 export function buildDoubleInductiveWeave(doubleString, datum, options = {}) {
