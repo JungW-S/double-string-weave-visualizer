@@ -1,11 +1,11 @@
-import { createDynkinDatum } from "./dynkin.mjs?v=20260710-layered-richardson-a4";
-import { completeWeaveFromComputedStrips } from "./weave.mjs?v=20260710-layered-richardson-a4";
+import { createDynkinDatum } from "./dynkin.mjs?v=20260710-layered-photo-tau";
+import { completeWeaveFromComputedStrips } from "./weave.mjs?v=20260710-layered-photo-tau";
 import {
   cycleColor,
   renderClusterVariableAnswerPanel,
   renderInteractiveWeaveViewer,
   renderQuiverAnswerPanel,
-} from "./render.mjs?v=20260710-layered-richardson-a4";
+} from "./render.mjs?v=20260710-layered-photo-tau";
 
 const form = document.querySelector("#input-form");
 const rankInput = document.querySelector("#rank-input");
@@ -176,8 +176,16 @@ function wordActionLabel(action) {
   return textWord(reducedWordForAction(action));
 }
 
+function inverseAction(action) {
+  const out = [];
+  action.forEach((value, idx) => {
+    out[value - 1] = idx + 1;
+  });
+  return out;
+}
+
 function vcActionFor(vWord, rank) {
-  return multiplyActions(longestAction(rank), actionOfWord(vWord, rank));
+  return multiplyActions(longestAction(rank), inverseAction(actionOfWord(vWord, rank)));
 }
 
 function computedVcWord(vWord, rank) {
@@ -189,7 +197,7 @@ function validateVcWord(vcWord, vWord, rank) {
   const expected = vcActionFor(vWord, rank);
   const actual = actionOfWord(vcWord, rank);
   if (!sameAction(actual, expected)) {
-    throw new Error("The entered β(v^c) does not represent w_0 v.");
+    throw new Error("The entered β(v^c) does not represent w_0 v^{-1}.");
   }
 }
 
@@ -208,7 +216,7 @@ function buildGreedySequence({ rank, wWord, vWord }) {
   wWord.forEach((generator, idx) => {
     const k = idx + 1;
     const before = current.slice();
-    const candidate = rightMultiplyAction(current, generator, rank);
+    const candidate = leftMultiplyAction(generator, current, rank);
     const beforeLength = coxeterLengthOfAction(before);
     const candidateLength = coxeterLengthOfAction(candidate);
     const used = candidateLength < beforeLength;
@@ -241,7 +249,7 @@ function buildGreedySequence({ rank, wWord, vWord }) {
   });
 
   if (coxeterLengthOfAction(current) !== 0) {
-    throw new Error("The greedy right sequence did not end at e. Check that v <= w for the entered β(w).");
+    throw new Error("The greedy sequence did not end at e. Check that v <= w for the entered β(w).");
   }
 
   return {
@@ -276,8 +284,8 @@ function buildLayeredPath({ rank, wWord, greedy }) {
     wLayerWord = [generator, ...wLayerWord];
     wAction = leftMultiplyAction(generator, wAction, rank);
     if (tau === 0) {
-      vLayerWord = [...vLayerWord, generator];
-      vAction = rightMultiplyAction(vAction, generator, rank);
+      vLayerWord = [generator, ...vLayerWord];
+      vAction = leftMultiplyAction(generator, vAction, rank);
     }
     steps.push({
       a,
@@ -667,7 +675,7 @@ function computeLayerStrips({ bottomWeave, layer, activeLayer, tVector, wWord })
       generator: wWord[originalK - 1],
       active: a === activeLayer,
       clusterLabels,
-      label: `a=${a}, k=${originalK}, i=${wWord[originalK - 1]}, t=${tau}`,
+      label: `a=${a}, k=${originalK}, i=${wWord[originalK - 1]}, τ=${tau}`,
       empty: endMove <= startMove,
     });
   }
@@ -685,7 +693,7 @@ function chipForEntry(entry) {
   if (entry.block === "v^c") {
     chip.title = `v^c letter ${entry.vcPosition}; ${entry.plus ? "length-increasing (+)" : "trivalent step"}`;
   } else {
-    chip.title = `w-position k=${entry.originalK}, layer a=${entry.layer}, t_k=${entry.tau}; ${entry.plus ? "length-increasing (+)" : "trivalent step"}`;
+    chip.title = `w-position k=${entry.originalK}, layer a=${entry.layer}, τ_a=t_k=${entry.tau}; ${entry.plus ? "length-increasing (+)" : "trivalent step"}`;
   }
   return chip;
 }
@@ -700,11 +708,11 @@ function renderConventionCard(data, partial) {
   const card = el("section", "card reverse-convention-card");
   card.appendChild(el("h2", "", "Convention"));
   const formula = el("div", "gls-formula-box reverse-formula-box");
-  formula.appendChild(htmlEl("p", "", "<span class=\"formula\">v<sup>c</sup>=w<sub>0</sub>v</span>."));
+  formula.appendChild(htmlEl("p", "", "<span class=\"formula\">v<sup>c</sup>=w<sub>0</sub>v<sup>-1</sup></span>."));
   formula.appendChild(htmlEl("p", "", "<span class=\"formula\">v<sup>c</sup>β(w)=(j<sub>1</sub>,...,j<sub>ℓ</sub>)</span>."));
   formula.appendChild(htmlEl("p", "", "<span class=\"formula\">s<sub>w,v</sub>=(j<sub>1</sub>R,...,j<sub>ℓ</sub>R)</span>."));
   formula.appendChild(htmlEl("p", "", "Draw the right inductive weave attached to the all-right string <span class=\"formula\">s<sub>w,v</sub></span>."));
-  formula.appendChild(htmlEl("p", "", "The greedy sequence uses <span class=\"formula\">v<sub>≥k</sub>s<sub>iₖ</sub></span>, so all multiplications on the <span class=\"formula\">v</span>-side are right multiplications."));
+  formula.appendChild(htmlEl("p", "", "The greedy sequence uses <span class=\"formula\">s<sub>iₖ</sub>v<sub>≥k</sub></span>, following the board definition."));
   card.appendChild(formula);
 
   const grid = el("div", "ric-data-grid layered-data-grid reverse-facts-grid");
@@ -718,7 +726,8 @@ function renderConventionCard(data, partial) {
     ["β((vᵃ)ᶜ)", textWord(partial.vcWord)],
     ["top boundary jᵃ", textWord(partial.jWord)],
     ["[1,r]_v", textSet(data.greedy.freePositions)],
-    ["t", `(${data.greedy.tVector.join(",")})`],
+    ["t_k by word", `(${data.greedy.tVector.join(",")})`],
+    ["τ_a by layer", `(${data.greedy.tVector.slice().reverse().join(",")})`],
   ].forEach(([key, value]) => {
     const row = el("div", "ric-data-row");
     row.append(el("span", "ric-data-key", key), el("span", "formula ric-data-value", value));
@@ -726,7 +735,7 @@ function renderConventionCard(data, partial) {
   });
   card.appendChild(grid);
   if (data.overrideVcWord !== null && partial.layer !== data.wWord.length) {
-    card.appendChild(el("p", "small-note", "The optional β(v^c) is used only at the final layer. Intermediate layers use the computed representative of w_0v^(a)."));
+    card.appendChild(el("p", "small-note", "The optional β(v^c) is used only at the final layer. Intermediate layers use the computed representative of w_0(v^(a))^{-1}."));
   }
   return card;
 }
@@ -737,7 +746,7 @@ function renderGreedyTable(data) {
   const table = el("table", "gls-data-table reverse-data-table");
   const head = el("thead");
   const headRow = el("tr");
-  ["k", "iₖ", "v≥k", "v≥k sᵢₖ", "comparison", "v≥k+1", "tₖ"].forEach((label) => headRow.appendChild(el("th", "", label)));
+  ["k", "iₖ", "v≥k", "sᵢₖ v≥k", "comparison", "v≥k+1", "tₖ"].forEach((label) => headRow.appendChild(el("th", "", label)));
   head.appendChild(headRow);
   table.appendChild(head);
   const body = el("tbody");
@@ -747,7 +756,7 @@ function renderGreedyTable(data) {
     tr.appendChild(el("td", "formula", String(step.generator)));
     tr.appendChild(el("td", "formula", textWord(step.beforeWord)));
     tr.appendChild(el("td", "formula", textWord(step.candidateWord)));
-    tr.appendChild(el("td", step.used ? "reverse-used-cell" : "reverse-free-cell", `v s${subscriptNumber(step.generator)} ${step.relation} v`));
+    tr.appendChild(el("td", step.used ? "reverse-used-cell" : "reverse-free-cell", `s${subscriptNumber(step.generator)} v ${step.relation} v`));
     tr.appendChild(el("td", "formula", textWord(step.nextWord)));
     tr.appendChild(el("td", step.t === 1 ? "reverse-free-cell" : "reverse-used-cell", String(step.t)));
     body.appendChild(tr);
@@ -755,7 +764,7 @@ function renderGreedyTable(data) {
   table.appendChild(body);
   card.appendChild(table);
   const note = el("p", "small-note");
-  note.textContent = "t_k=1 leaves v unchanged; t_k=0 changes v by right multiplication.";
+  note.textContent = "Here t_k is indexed by the original word position k. Layer a uses τ_a=t_{r-a+1}.";
   card.appendChild(note);
   return card;
 }
@@ -789,11 +798,11 @@ function renderPathTable(data, layer) {
 function renderWeakBruhatPath(data, layer) {
   const card = el("section", "card layered-visual-card layered-weak-card");
   const head = el("div", "layered-panel-head");
-  head.appendChild(el("h3", "", "Greedy weak path"));
+  head.appendChild(el("h3", "", "Layer stacking path"));
   const legend = el("div", "layered-path-legend");
   [
-    ["case1", "tₖ=0"],
-    ["case2", "tₖ=1"],
+    ["case1", "τₐ=0"],
+    ["case2", "τₐ=1"],
   ].forEach(([className, label]) => {
     const item = el("span", "layered-path-legend-item");
     item.appendChild(el("span", `layered-path-swatch ${className}`));
@@ -873,7 +882,7 @@ function renderWeakBruhatPath(data, layer) {
 
     const midX = (prevX + nextX) / 2;
     appendSvgText(svg, midX, y - 22, `k=${step.originalK}, i=${step.generator}`, `layered-edge-label ${className}`);
-    appendSvgText(svg, midX, y + 34, `t=${step.tau}`, `layered-edge-label ${className} ${active ? "active" : ""}`);
+    appendSvgText(svg, midX, y + 34, `τ=${step.tau}`, `layered-edge-label ${className} ${active ? "active" : ""}`);
   });
 
   steps.forEach((step) => {
@@ -904,7 +913,7 @@ function renderWeakBruhatPath(data, layer) {
   scroll.appendChild(svg);
   card.appendChild(scroll);
   const note = el("p", "small-note");
-  note.textContent = "Click a node or colored edge to move the layer. Blue means t_k=0; red means t_k=1.";
+  note.textContent = "Click a node or colored edge to move the layer. Blue means τ_a=0; red means τ_a=1.";
   card.appendChild(note);
   return card;
 }
@@ -922,8 +931,8 @@ function renderLayerCards(data, layer, activeLayer) {
     button.type = "button";
     button.addEventListener("click", () => setActiveLayer(step.a));
     button.appendChild(el("span", "layer-card-kicker", `a=${step.a}, k=${step.originalK}, i=${step.generator}`));
-    button.appendChild(el("strong", "", step.tau === 1 ? "t_k=1" : "t_k=0"));
-    button.appendChild(el("span", "", step.tau === 1 ? "v is unchanged in the greedy sequence" : "v is changed by right multiplication"));
+    button.appendChild(el("strong", "", step.tau === 1 ? "τ_a=1" : "τ_a=0"));
+    button.appendChild(el("span", "", step.tau === 1 ? "v is unchanged in the greedy sequence" : "v is changed by left multiplication"));
     button.appendChild(el("span", "layer-card-pair", `(${textWord(data.pathSteps[step.a - 1].wWord)},${textWord(data.pathSteps[step.a - 1].vWord)}) → (${textWord(step.wWord)},${textWord(step.vWord)})`));
     strip.appendChild(button);
   });
@@ -946,13 +955,13 @@ function renderCurrentDoubleString(partial) {
   expression.appendChild(renderDoubleStringChips(partial.doubleString));
   card.appendChild(expression);
   const note = el("p", "small-note");
-  note.textContent = "The + marks length-increasing steps. Colors record the v^c block and the t_k data in the w block.";
+  note.textContent = "The + marks length-increasing steps. Colors record the v^c block and the τ_a=t_k data in the w block.";
   card.appendChild(note);
   const legend = el("div", "reverse-chip-legend");
   [
     ["prefix", "vᶜ block"],
-    ["reverse-used", "w block, tₖ=0"],
-    ["reverse-free", "w block, tₖ=1"],
+    ["reverse-used", "w block, τₐ=0"],
+    ["reverse-free", "w block, τₐ=1"],
   ].forEach(([className, label]) => {
     const item = el("span", "reverse-chip-legend-item");
     item.appendChild(el("span", `reverse-chip-swatch ${className}`));
@@ -990,7 +999,7 @@ function renderSeedPanels(trace) {
   header.appendChild(el("div", "answer-panel-actions", "click edges or vertices"));
   weavePanel.appendChild(header);
   const note = el("p", "small-note");
-  note.textContent = "Bands mark Richardson layers in the right inductive weave. A t_k=1 layer contains the right-inductive braid path ending at a trivalent vertex; a t_k=0 layer is length-increasing.";
+  note.textContent = "Bands mark Richardson layers in the right inductive weave. A τ_a=1 layer contains the right-inductive braid path ending at a trivalent vertex; a τ_a=0 layer is length-increasing.";
   weavePanel.appendChild(note);
   const viewer = renderInteractiveWeaveViewer(trace, { cycleColors });
   viewer.classList.add(

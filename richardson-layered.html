@@ -13,7 +13,7 @@
           <p class="eyebrow">open Richardson weave</p>
           <h1>Layered Richardson weave</h1>
           <p class="subtitle">
-            Visualize the right-inductive layered convention using <span class="formula">v<sup>c</sup>=w<sub>0</sub>v</span>,
+            Visualize the right-inductive layered convention using <span class="formula">v<sup>c</sup>=w<sub>0</sub>v<sup>-1</sup></span>,
             <span class="formula">v<sup>c</sup>β(w)=(j<sub>1</sub>,...,j<sub>ℓ</sub>)</span>, and
             <span class="formula">s<sub>w,v</sub>=(j<sub>1</sub>R,...,j<sub>ℓ</sub>R)</span>.
           </p>
@@ -53,7 +53,7 @@
 
             <label class="field">
               <span>Optional β(vᶜ) for final layer</span>
-              <textarea id="vc-input" name="vc" rows="2" spellcheck="false" placeholder="computed from w₀v"></textarea>
+              <textarea id="vc-input" name="vc" rows="2" spellcheck="false" placeholder="computed from w₀v⁻¹"></textarea>
             </label>
 
             <label class="field layered-slider-field">
@@ -75,8 +75,8 @@
 
           <button type="submit" class="primary-button">Build layered weave</button>
           <p class="input-note">
-            The sequence <span class="formula">v<sub>≥k</sub></span> uses right multiplication:
-            <span class="formula">v<sub>≥k</sub>s<sub>i_k</sub></span>.
+            The sequence <span class="formula">v<sub>≥k</sub></span> uses the board definition:
+            <span class="formula">s<sub>i_k</sub>v<sub>≥k</sub></span>.
           </p>
           <div id="error-box" class="error-box" hidden></div>
         </form>
@@ -85,6 +85,6 @@
       </section>
     </main>
 
-    <script type="module" src="./src/richardson-layered.mjs?v=20260710-layered-richardson-a4"></script>
+    <script type="module" src="./src/richardson-layered.mjs?v=20260710-layered-photo-tau"></script>
   </body>
 </html>
