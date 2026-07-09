@@ -1073,7 +1073,7 @@ function renderSeedPanels(trace) {
     variableHeader: trace.variableHeader,
   });
 
-  panels.append(weavePanel, quiverPanel, clusterPanel);
+  panels.append(quiverPanel, weavePanel, clusterPanel);
   syncSelection();
   return panels;
 }
