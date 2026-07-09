@@ -1,11 +1,11 @@
-import { createDynkinDatum } from "./dynkin.mjs?v=20260710-layered-photo-tau";
-import { completeWeaveFromComputedStrips } from "./weave.mjs?v=20260710-layered-photo-tau";
+import { createDynkinDatum } from "./dynkin.mjs?v=20260710-layered-random";
+import { completeWeaveFromComputedStrips } from "./weave.mjs?v=20260710-layered-random";
 import {
   cycleColor,
   renderClusterVariableAnswerPanel,
   renderInteractiveWeaveViewer,
   renderQuiverAnswerPanel,
-} from "./render.mjs?v=20260710-layered-photo-tau";
+} from "./render.mjs?v=20260710-layered-random";
 
 const form = document.querySelector("#input-form");
 const rankInput = document.querySelector("#rank-input");
@@ -18,6 +18,7 @@ const output = document.querySelector("#output");
 const errorBox = document.querySelector("#error-box");
 const photoExampleButton = document.querySelector("#photo-example-button");
 const smallExampleButton = document.querySelector("#small-example-button");
+const randomExampleButton = document.querySelector("#random-example-button");
 const layerPrevButton = document.querySelector("#layer-prev-button");
 const layerNextButton = document.querySelector("#layer-next-button");
 
@@ -158,6 +159,61 @@ function reducedWordForAction(action) {
 
 function isReducedTypeAWord(word, rank) {
   return coxeterLengthOfAction(actionOfWord(word, rank)) === word.length;
+}
+
+function randomInteger(min, max) {
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
+
+function lengthIncreasingRightGenerators(action, rank) {
+  const currentLength = coxeterLengthOfAction(action);
+  const options = [];
+  for (let generator = 1; generator <= rank; generator += 1) {
+    const candidate = rightMultiplyAction(action, generator, rank);
+    if (coxeterLengthOfAction(candidate) > currentLength) options.push(generator);
+  }
+  return options;
+}
+
+function randomReducedWord(rank) {
+  const longestLength = (rank * (rank + 1)) / 2;
+  const minLength = Math.min(longestLength, Math.max(2, rank + 1));
+  const maxLength = Math.min(longestLength, Math.max(minLength, 2 * rank + 3));
+  const targetLength = randomInteger(minLength, maxLength);
+  let action = identityAction(rank + 1);
+  const word = [];
+
+  while (word.length < targetLength) {
+    const options = lengthIncreasingRightGenerators(action, rank);
+    if (options.length === 0) break;
+    const generator = options[randomInteger(0, options.length - 1)];
+    word.push(generator);
+    action = rightMultiplyAction(action, generator, rank);
+  }
+
+  return word;
+}
+
+function randomReducedSubword(word, rank) {
+  let action = identityAction(rank + 1);
+  const out = [];
+  const selectionRate = 0.28 + Math.random() * 0.32;
+
+  word.forEach((generator) => {
+    const candidate = rightMultiplyAction(action, generator, rank);
+    if (coxeterLengthOfAction(candidate) <= coxeterLengthOfAction(action)) return;
+    if (Math.random() < selectionRate) {
+      out.push(generator);
+      action = candidate;
+    }
+  });
+
+  if (out.length === 0 && word.length > 0 && Math.random() < 0.85) {
+    out.push(word[randomInteger(0, word.length - 1)]);
+  }
+
+  if (out.length === word.length && out.length > 1) out.pop();
+  return out;
 }
 
 function textWord(word) {
@@ -1161,6 +1217,16 @@ function writeExample(example) {
   vcInput.value = example.vc ?? "";
 }
 
+function writeRandomExample() {
+  const rank = parsePositiveInteger(rankInput.value, "rank");
+  const wWord = randomReducedWord(rank);
+  const vWord = randomReducedSubword(wWord, rank);
+  rankInput.value = String(rank);
+  wInput.value = spacedWord(wWord);
+  vInput.value = spacedWord(vWord);
+  vcInput.value = "";
+}
+
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   runConstruction();
@@ -1218,6 +1284,13 @@ smallExampleButton.addEventListener("click", () => {
   writeExample(examples.small);
   runConstruction();
 });
+
+if (randomExampleButton) {
+  randomExampleButton.addEventListener("click", () => {
+    writeRandomExample();
+    runConstruction();
+  });
+}
 
 writeExample(examples.photo);
 runConstruction();
