@@ -1,11 +1,11 @@
-import { createDynkinDatum } from "./dynkin.mjs?v=20260710-layered-random";
-import { completeWeaveFromComputedStrips } from "./weave.mjs?v=20260710-layered-random";
+import { createDynkinDatum } from "./dynkin.mjs?v=20260710-layered-compare-fit";
+import { completeWeaveFromComputedStrips } from "./weave.mjs?v=20260710-layered-compare-fit";
 import {
   cycleColor,
   renderClusterVariableAnswerPanel,
   renderInteractiveWeaveViewer,
   renderQuiverAnswerPanel,
-} from "./render.mjs?v=20260710-layered-random";
+} from "./render.mjs?v=20260710-layered-compare-fit";
 
 const form = document.querySelector("#input-form");
 const rankInput = document.querySelector("#rank-input");
@@ -19,6 +19,7 @@ const errorBox = document.querySelector("#error-box");
 const photoExampleButton = document.querySelector("#photo-example-button");
 const smallExampleButton = document.querySelector("#small-example-button");
 const randomExampleButton = document.querySelector("#random-example-button");
+const compareToggleButton = document.querySelector("#compare-toggle-button");
 const layerPrevButton = document.querySelector("#layer-prev-button");
 const layerNextButton = document.querySelector("#layer-next-button");
 
@@ -40,6 +41,9 @@ const examples = {
 let currentData = null;
 let currentLayer = 0;
 let currentActiveLayer = 0;
+let compareOpen = false;
+let compareLayerA = null;
+let compareLayerB = null;
 
 function el(tag, className = "", text = "") {
   const node = document.createElement(tag);
@@ -1078,6 +1082,115 @@ function renderSeedPanels(trace) {
   return panels;
 }
 
+function cycleColorsForWeave(weave) {
+  return new Map((weave.lusztigCycles ?? []).map((cycle, idx) => [cycle.label, cycleColor(idx)]));
+}
+
+function clampCompareLayer(data, value) {
+  const numeric = Number.parseInt(String(value), 10);
+  const fallback = data.wWord.length;
+  const layer = Number.isFinite(numeric) ? numeric : fallback;
+  return Math.max(0, Math.min(data.wWord.length, layer));
+}
+
+function ensureCompareLayers(data) {
+  if (compareLayerB === null) compareLayerB = currentLayer;
+  if (compareLayerA === null) compareLayerA = Math.max(0, compareLayerB - 1);
+  compareLayerA = clampCompareLayer(data, compareLayerA);
+  compareLayerB = clampCompareLayer(data, compareLayerB);
+}
+
+function renderCompareQuiver(title, partial) {
+  const block = el("section", "layer-compare-quiver-block");
+  block.appendChild(el("h3", "", title));
+  block.appendChild(renderQuiverAnswerPanel(partial.trace.bottomWeave, cycleColorsForWeave(partial.trace.bottomWeave), null, null, {
+    quiverLabel: partial.trace.quiverLabel,
+    matrixLabel: partial.trace.matrixLabel,
+  }));
+  return block;
+}
+
+function renderCompareWeave(title, partial) {
+  const block = el("section", "layer-compare-weave-block");
+  block.appendChild(el("h3", "", title));
+  const viewer = renderInteractiveWeaveViewer(partial.trace, {
+    cycleColors: cycleColorsForWeave(partial.trace.bottomWeave),
+  });
+  viewer.classList.add("layer-compare-weave-viewer");
+  block.appendChild(viewer);
+  return block;
+}
+
+function renderLayerComparePanel(data) {
+  ensureCompareLayers(data);
+  const leftLayer = compareLayerA;
+  const rightLayer = compareLayerB;
+  const left = buildPartialData(data, leftLayer);
+  const right = buildPartialData(data, rightLayer);
+
+  const card = el("section", "card layer-compare-card");
+  const header = el("div", "layer-compare-header");
+  const titleBlock = el("div");
+  titleBlock.appendChild(el("h2", "", "Step comparison"));
+  titleBlock.appendChild(el("p", "card-subtitle", `Compare a=${leftLayer} and a=${rightLayer}.`));
+  const controls = el("div", "layer-compare-controls");
+  [
+    ["A", leftLayer, (value) => { compareLayerA = value; }],
+    ["B", rightLayer, (value) => {
+      compareLayerB = value;
+      setLayer(value);
+    }],
+  ].forEach(([label, value, setter]) => {
+    const field = el("label", "layer-compare-field");
+    field.appendChild(el("span", "", label));
+    const input = el("input");
+    input.type = "number";
+    input.min = "0";
+    input.max = String(data.wWord.length);
+    input.step = "1";
+    input.value = String(value);
+    input.addEventListener("change", () => {
+      const next = clampCompareLayer(data, input.value);
+      setter(next);
+      if (label !== "B") renderData(data, currentLayer, currentActiveLayer);
+    });
+    field.appendChild(input);
+    controls.appendChild(field);
+  });
+  const previousCurrent = el("button", "secondary-button layer-compare-preset", "previous/current");
+  previousCurrent.type = "button";
+  previousCurrent.addEventListener("click", () => {
+    compareLayerB = currentLayer;
+    compareLayerA = Math.max(0, currentLayer - 1);
+    renderData(data, currentLayer, currentActiveLayer);
+  });
+  const currentFinal = el("button", "secondary-button layer-compare-preset", "current/final");
+  currentFinal.type = "button";
+  currentFinal.addEventListener("click", () => {
+    compareLayerA = currentLayer;
+    compareLayerB = data.wWord.length;
+    renderData(data, currentLayer, currentActiveLayer);
+  });
+  controls.append(previousCurrent, currentFinal);
+  header.append(titleBlock, controls);
+  card.appendChild(header);
+
+  const quiverGrid = el("div", "layer-compare-quiver-grid");
+  quiverGrid.append(
+    renderCompareQuiver(`Quiver at a=${leftLayer}`, left),
+    renderCompareQuiver(`Quiver at a=${rightLayer}`, right),
+  );
+  card.appendChild(quiverGrid);
+
+  const weaveGrid = el("div", "layer-compare-weave-grid");
+  weaveGrid.append(
+    renderCompareWeave(`Weave at a=${leftLayer}`, left),
+    renderCompareWeave(`Weave at a=${rightLayer}`, right),
+  );
+  card.appendChild(weaveGrid);
+  return card;
+}
+
 function childrenWithoutHeading(card) {
   const heading = card.querySelector("h2");
   if (heading) heading.remove();
@@ -1114,6 +1227,7 @@ function renderData(data, layer, activeLayer = layer) {
     renderWeakBruhatPath(data, layer),
     renderCurrentDoubleString(partial),
   );
+  if (compareOpen) root.appendChild(renderLayerComparePanel(data));
 
   const weaveCard = el("section", "card layered-main-weave-card reverse-main-weave-card");
   weaveCard.appendChild(htmlEl("h2", "", `𝒲<sub>layer</sub>(a=${layer})`));
@@ -1124,6 +1238,7 @@ function renderData(data, layer, activeLayer = layer) {
   root.appendChild(weaveCard);
   root.appendChild(renderDiagnosticsPanel(data, layer, activeLayer));
   output.replaceChildren(root);
+  syncCompareToggle();
 }
 
 function readDataInput() {
@@ -1164,6 +1279,13 @@ function clearError() {
   errorBox.hidden = true;
 }
 
+function syncCompareToggle() {
+  if (!compareToggleButton) return;
+  compareToggleButton.classList.toggle("active", compareOpen);
+  compareToggleButton.setAttribute("aria-pressed", String(compareOpen));
+  compareToggleButton.textContent = compareOpen ? "Hide compare" : "Compare steps";
+}
+
 function syncSlider(data, layer) {
   layerInput.min = "0";
   layerInput.max = String(data.wWord.length);
@@ -1184,6 +1306,10 @@ function runConstruction(requestedLayer = null) {
     const layer = Math.max(0, Math.min(data.wWord.length, Number.isFinite(rawLayer) ? rawLayer : data.wWord.length));
     currentLayer = layer;
     currentActiveLayer = layer;
+    if (compareOpen) {
+      compareLayerB = layer;
+      compareLayerA = Math.max(0, layer - 1);
+    }
     syncSlider(data, layer);
     renderData(data, layer, currentActiveLayer);
   } catch (error) {
@@ -1191,6 +1317,7 @@ function runConstruction(requestedLayer = null) {
     currentData = null;
     currentLayer = 0;
     currentActiveLayer = 0;
+    syncCompareToggle();
     setError(error instanceof Error ? error.message : String(error));
   }
 }
@@ -1200,6 +1327,10 @@ function setLayer(layer) {
   const next = Math.max(0, Math.min(currentData.wWord.length, layer));
   currentLayer = next;
   currentActiveLayer = next;
+  if (compareOpen) {
+    compareLayerB = next;
+    compareLayerA = Math.max(0, next - 1);
+  }
   syncSlider(currentData, next);
   renderData(currentData, next, currentActiveLayer);
 }
@@ -1290,6 +1421,20 @@ if (randomExampleButton) {
     writeRandomExample();
     runConstruction();
   });
+}
+
+if (compareToggleButton) {
+  compareToggleButton.addEventListener("click", () => {
+    if (!currentData) runConstruction();
+    if (!currentData) return;
+    compareOpen = !compareOpen;
+    if (compareOpen) {
+      compareLayerB = currentLayer;
+      compareLayerA = Math.max(0, currentLayer - 1);
+    }
+    renderData(currentData, currentLayer, currentActiveLayer);
+  });
+  syncCompareToggle();
 }
 
 writeExample(examples.photo);
