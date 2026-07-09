@@ -7,19 +7,16 @@ const rankInput = document.querySelector("#rank-input");
 const wInput = document.querySelector("#w-input");
 const vInput = document.querySelector("#v-input");
 const vcInput = document.querySelector("#vc-input");
-const doubleStringInput = document.querySelector("#double-string-input");
 const output = document.querySelector("#output");
 const errorBox = document.querySelector("#error-box");
 const exampleButton = document.querySelector("#example-button");
 const randomButton = document.querySelector("#random-button");
-const generateButton = document.querySelector("#generate-button");
 
 const defaultExample = {
   rank: "3",
   w: "1 2 1 3 2 1",
   v: "2 3",
   vc: "",
-  doubleString: "",
 };
 
 function el(tag, className = "", text = "") {
@@ -46,47 +43,6 @@ function parseTypeAWord(text, name, rank) {
   const bad = sequence.find((entry) => entry < 1 || entry > rank);
   if (bad !== undefined) throw new Error(`${name} contains ${bad}, outside type A_${rank}.`);
   return sequence;
-}
-
-function normalizeDoubleStringText(text) {
-  return String(text ?? "")
-    .replace(/\\mathbf\{L\}|\\bfL|\\mathcal\{L\}|\\calL/g, "L")
-    .replace(/\\mathbf\{R\}|\\bfR|\\mathcal\{R\}|\\calR/g, "R")
-    .replace(/\^\{?\+}?/g, "+")
-    .replace(/[()[\]{},]/g, " ")
-    .trim();
-}
-
-function parseDoubleString(text) {
-  const normalized = normalizeDoubleStringText(text);
-  if (normalized === "") throw new Error("Double string is empty.");
-  const tokens = normalized.split(/\s+/);
-  const entries = [];
-  for (let idx = 0; idx < tokens.length; idx += 1) {
-    const token = tokens[idx];
-    const compact = /^([1-9][0-9]*)([LRlr])(\+)?$/.exec(token);
-    if (compact) {
-      entries.push({
-        h: Number.parseInt(compact[1], 10),
-        side: compact[2].toUpperCase(),
-        plus: compact[3] === "+",
-      });
-      continue;
-    }
-    const split = /^([1-9][0-9]*)$/.exec(token);
-    const side = /^([LRlr])(\+)?$/.exec(tokens[idx + 1] ?? "");
-    if (split && side) {
-      entries.push({
-        h: Number.parseInt(split[1], 10),
-        side: side[1].toUpperCase(),
-        plus: side[2] === "+",
-      });
-      idx += 1;
-      continue;
-    }
-    throw new Error(`Invalid double string entry "${token}". Use entries like 1L, 2R, or 1L+.`);
-  }
-  return entries.map((entry, idx) => ({ ...entry, step: idx + 1, source: entry.source ?? "custom" }));
 }
 
 function identityAction(size) {
@@ -283,31 +239,13 @@ function readRichardsonDataInput() {
   };
 }
 
-function generatedDoubleStringText() {
-  const data = readRichardsonDataInput();
-  vcInput.placeholder = data.computedVcWord.join(" ");
-  return formatDoubleString(data.generatedDoubleString);
-}
-
 function buildOpenRichardsonTrace() {
   const data = readRichardsonDataInput();
-  const activeText = doubleStringInput.value.trim() === "" ? formatDoubleString(data.generatedDoubleString) : doubleStringInput.value;
-  if (doubleStringInput.value.trim() === "") doubleStringInput.value = activeText;
-  const parsedDoubleString = parseDoubleString(activeText);
-  parsedDoubleString.forEach((entry) => {
-    if (entry.h < 1 || entry.h > data.rank) throw new Error(`Double string contains ${entry.h}, outside type A_${data.rank}.`);
-  });
-  const firstPass = buildDoubleInductiveWeave(parsedDoubleString, data.dynkin);
-  const doubleString = parsedDoubleString.map((entry, idx) => ({
-    ...entry,
-    plus: firstPass.stepInfos[idx]?.plus ?? entry.plus,
-  }));
+  const doubleString = data.generatedDoubleString.map((entry) => ({ ...entry }));
   const bottomWeave = buildDoubleInductiveWeave(doubleString, data.dynkin, { coordinatePrefix: "z" });
-  doubleStringInput.value = formatDoubleString(doubleString);
   const topBoundaryWord = bottomWeave.words[0]?.slice() ?? [];
   const topCoordinates = topBoundaryWord.map((_, idx) => `z${idx + 1}`);
   const generatedText = formatDoubleString(data.generatedDoubleString);
-  const activeGenerated = formatDoubleString(doubleString) === generatedText;
   const plusSet = new Set(data.plusPositions);
   const terminalVStarBlock = data.vStarWord.slice();
   const editorParams = new URLSearchParams({
@@ -334,14 +272,12 @@ function buildOpenRichardsonTrace() {
     fullClusterValues: bottomWeave.coordinateAvailable ? bottomWeave.clusterValues ?? [] : [],
     fullClusterValuesOmitted: !bottomWeave.coordinateAvailable,
     fullClusterValuesOmittedReason: bottomWeave.coordinateAvailable ? "" : "Coordinate formulas are not implemented for this type.",
-    weaveTitle: activeGenerated ? "𝒲_Ric^L" : "𝒲(s)",
-    weaveSubtitle: activeGenerated
-      ? "𝒲_Ric^L is the double inductive weave attached to the CGGLS-Ménard left Richardson double string."
-      : "The active double string has been edited; the weave is computed from the textarea.",
-    junctionLabel: activeGenerated ? "s_Ric^L" : "s",
-    quiverLabel: activeGenerated ? "Q(𝒲_Ric^L)" : "Q(𝒲(s))",
-    matrixLabel: activeGenerated ? "B(Q(𝒲_Ric^L))" : "B(Q(𝒲(s)))",
-    variableHeader: activeGenerated ? "A_t = A_t(𝒲_Ric^L)" : "A_t = A_t(𝒲(s))",
+    weaveTitle: "𝒲_Ric^L",
+    weaveSubtitle: "𝒲_Ric^L is the double inductive weave attached to the CGGLS-Ménard left Richardson double string.",
+    junctionLabel: "s_Ric^L",
+    quiverLabel: "Q(𝒲_Ric^L)",
+    matrixLabel: "B(Q(𝒲_Ric^L))",
+    variableHeader: "A_t = A_t(𝒲_Ric^L)",
     openRichardson: {
       rank: data.rank,
       vWord: data.vWord,
@@ -353,7 +289,6 @@ function buildOpenRichardsonTrace() {
       nonPlusPositions: data.wWord.map((_, idx) => idx + 1).filter((position) => !plusSet.has(position)),
       generatedDoubleString: data.generatedDoubleString,
       generatedText,
-      activeGenerated,
       dimension: data.wWord.length - data.vWord.length,
       terminalVStarBlock,
       editorHref: `./double-string-weave.html?${editorParams.toString()}`,
@@ -409,10 +344,6 @@ function renderRichardsonData(trace) {
   generated.appendChild(chipRow(ric.generatedDoubleString));
   card.appendChild(generated);
 
-  if (!ric.activeGenerated) {
-    card.appendChild(el("p", "small-note", "The active double string was edited. The Richardson data above still records the CGGLS string generated from (v,w), while the weave below is computed from the textarea."));
-  }
-
   const actions = el("div", "chain-box-move-actions richardson-actions");
   const editorLink = el("a", "secondary-button", "Open active string in double-string editor");
   editorLink.href = ric.editorHref;
@@ -440,7 +371,6 @@ function readInput() {
     w: wInput.value,
     v: vInput.value,
     vc: vcInput.value,
-    doubleString: doubleStringInput.value,
   };
 }
 
@@ -449,7 +379,6 @@ function writeInput(values) {
   wInput.value = values.w;
   vInput.value = values.v;
   vcInput.value = values.vc ?? "";
-  doubleStringInput.value = values.doubleString ?? "";
 }
 
 function setError(message) {
@@ -471,7 +400,7 @@ function syncUrl(trace) {
   url.searchParams.set("v", ric.vWord.join(" "));
   if (vcInput.value.trim() === "") url.searchParams.delete("vc");
   else url.searchParams.set("vc", ric.vcWord.join(" "));
-  url.searchParams.set("s", formatDoubleString(trace.doubleString));
+  url.searchParams.delete("s");
   window.history.replaceState(null, "", url);
 }
 
@@ -495,14 +424,12 @@ function inputFromUrl() {
     const w = params.get("w");
     const v = params.get("v");
     const vc = params.get("vc");
-    const doubleString = params.get("s");
-    if (!rank && !w && !v && !vc && !doubleString) return null;
+    if (!rank && !w && !v && !vc) return null;
     return {
       rank: rank ?? defaultExample.rank,
       w: w ?? defaultExample.w,
       v: v ?? defaultExample.v,
       vc: vc ?? "",
-      doubleString: doubleString ?? "",
     };
   } catch {
     return null;
@@ -552,7 +479,6 @@ function randomExample() {
     w: wWord.join(" "),
     v: vWord.join(" "),
     vc: "",
-    doubleString: "",
   };
 }
 
@@ -563,7 +489,6 @@ form.addEventListener("submit", (event) => {
 
 exampleButton.addEventListener("click", () => {
   writeInput(defaultExample);
-  doubleStringInput.value = generatedDoubleStringText();
   runConstruction();
 });
 
@@ -571,18 +496,6 @@ randomButton.addEventListener("click", () => {
   try {
     clearError();
     writeInput(randomExample());
-    doubleStringInput.value = generatedDoubleStringText();
-    runConstruction();
-  } catch (error) {
-    output.replaceChildren();
-    setError(error instanceof Error ? error.message : String(error));
-  }
-});
-
-generateButton.addEventListener("click", () => {
-  try {
-    clearError();
-    doubleStringInput.value = generatedDoubleStringText();
     runConstruction();
   } catch (error) {
     output.replaceChildren();
@@ -592,11 +505,4 @@ generateButton.addEventListener("click", () => {
 
 const urlInput = inputFromUrl();
 writeInput(urlInput ?? defaultExample);
-if (!urlInput?.doubleString) {
-  try {
-    doubleStringInput.value = generatedDoubleStringText();
-  } catch {
-    doubleStringInput.value = "";
-  }
-}
-runConstruction({ preserveUrl: Boolean(urlInput) });
+runConstruction();
